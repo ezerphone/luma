@@ -76,9 +76,9 @@ class CustomizationActivity : BaseActivity() {
     private fun deleteDir(dir: String, statusView: TextView) {
         show(statusView, "מוחק…", dim)
         Thread {
-            // בלי 2>/dev/null הפעם: רוצים לראות את הודעת השגיאה האמיתית אם משהו נכשל
-            val cmd = "mount -o remount,rw /system; mount -o remount,rw /system_ext; " +
-                "echo ---; mount | grep -E ' /system| /system_ext'; echo ---; " +
+            // במכשירי system-as-root אין נקודת עגינה נפרדת ל-/system, לכן מנסים גם remount על השורש עצמו
+            val cmd = "mount -o remount,rw / 2>&1; mount -o remount,rw /system 2>&1; mount -o remount,rw /system_ext 2>&1; " +
+                "echo ---; awk '\$2==\"/\"||\$2==\"/system\"||\$2==\"/system_ext\"{print}' /proc/mounts; echo ---; " +
                 "rm -rf ${q(dir)} 2>&1; [ -d ${q(dir)} ] && echo STILL_EXISTS || echo REMOVED"
             val (code, out) = runAsRoot(cmd)
             runOnUiThread {
@@ -100,8 +100,8 @@ class CustomizationActivity : BaseActivity() {
             try {
                 val tmp = File(cacheDir, "camera_stock.apk")
                 assets.open("camera_stock.apk").use { input -> FileOutputStream(tmp).use { out -> input.copyTo(out) } }
-                val cmd = "mount -o remount,rw /system_ext; mount -o remount,rw /system; " +
-                    "echo ---; mount | grep -E ' /system| /system_ext'; echo ---; " +
+                val cmd = "mount -o remount,rw / 2>&1; mount -o remount,rw /system_ext 2>&1; mount -o remount,rw /system 2>&1; " +
+                    "echo ---; awk '\$2==\"/\"||\$2==\"/system\"||\$2==\"/system_ext\"{print}' /proc/mounts; echo ---; " +
                     "cp ${q(tmp.absolutePath)} ${q(cameraApk)} 2>&1 && chmod 644 ${q(cameraApk)} 2>&1 && echo OK"
                 val (code, out) = runAsRoot(cmd)
                 runOnUiThread {
