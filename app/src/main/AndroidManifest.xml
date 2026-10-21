@@ -1,0 +1,61 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <!-- הקלדה קולית: מיקרופון (הרשאת ריצה) -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <!-- הרשאות privileged: פועלות רק אם עזרים מותקנת כ-priv-app עם קובץ אישור הרשאות מתאים בקושחה -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"/>
+    <uses-permission android:name="android.permission.CHANGE_COMPONENT_ENABLED_STATE"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-feature android:name="android.hardware.camera.flash" android:required="true"/>
+    <queries><intent><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent></queries>
+    <application android:name=".LumaApp" android:label="עזרים" android:supportsRtl="true"
+        android:dataExtractionRules="@xml/backup_rules_31" android:fullBackupContent="@xml/backup_rules_29" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher" android:theme="@android:style/Theme.Material.NoActionBar">
+        <activity android:name=".MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts"/>
+        </activity>
+        <activity android:name=".FlashActivity" android:exported="false"/>
+        <activity android:name=".CameraButtonActivity" android:exported="false"/>
+        <activity android:name=".CameraActionActivity" android:exported="false"/>
+        <activity android:name=".BtAddressActivity" android:exported="false"/>
+        <activity android:name=".RotationActivity" android:exported="false"/>
+        <activity android:name=".HideIconActivity" android:exported="false"/>
+        <activity android:name=".SettingsActivity" android:exported="false"/>
+        <activity android:name=".CustomizationActivity" android:exported="false"/>
+        <activity android:name=".MockLocationActivity" android:exported="false"/>
+        <activity android:name=".dictation.DictationActivity" android:exported="false" android:windowSoftInputMode="adjustResize"/>
+        <activity android:name=".dictation.DictionaryActivity" android:exported="false" android:windowSoftInputMode="adjustResize"/>
+        <activity android:name=".dictation.DictationLegalActivity" android:exported="false"/>
+        <activity android:name=".ActionActivity" android:exported="true" android:excludeFromRecents="true"
+            android:taskAffinity="" android:theme="@android:style/Theme.Translucent.NoTitleBar"/>
+        <receiver android:name=".BootReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+            </intent-filter>
+        </receiver>
+        <service android:name=".CameraButtonService" android:exported="true" android:label="עזרים – כפתור המצלמה"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter><action android:name="android.accessibilityservice.AccessibilityService"/></intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/a11y"/>
+        </service>
+        <service android:name=".dictation.VoiceKeyboardService" android:exported="true" android:label="עזרים – הקלדה קולית"
+            android:permission="android.permission.BIND_INPUT_METHOD">
+            <intent-filter><action android:name="android.view.InputMethod"/></intent-filter>
+            <meta-data android:name="android.view.im" android:resource="@xml/voice_ime"/>
+        </service>
+        <service android:name=".FlashService" android:exported="false" android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="shake_to_toggle_flashlight"/>
+        </service>
+        <service android:name=".FlashTile" android:exported="true" android:label="פנס" android:icon="@drawable/ic_flash"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE"/></intent-filter>
+        </service>
+    </application>
+</manifest>
