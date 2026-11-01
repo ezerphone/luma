@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- מעניק מראש הרשאות ריצה לעזרים, כך שהמשתמש לא יתבקש לאשר אותן.
+     נקרא מ-/system/etc/default-permissions/. ההענקה מתבצעת באתחול הראשון אחרי צריבה או איפוס. -->
+<exceptions>
+    <exception package="com.android.adds">
+        <permission name="android.permission.RECORD_AUDIO" fixed="false"/>
+        <permission name="android.permission.POST_NOTIFICATIONS" fixed="false"/>
+        <!-- עזר (העוזר הקולי): ניגון שירים מהמכשיר ובלוטוס -->
+        <permission name="android.permission.READ_MEDIA_AUDIO" fixed="false"/>
+        <permission name="android.permission.BLUETOOTH_CONNECT" fixed="false"/>
+    </exception>
+</exceptions>
