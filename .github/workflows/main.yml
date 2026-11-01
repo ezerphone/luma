@@ -1,0 +1,21 @@
+name: Build APK
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: 8.7 }
+      - run: bash prepare-runtime.sh
+      - run: gradle assembleDebug
+      # מעתיק את החתימה של donor/MtkSystemUI.apk (חתום במפתח המערכת) לתוך ה-APK. יוצא קובץ אחד בלבד.
+      - name: Graft platform signature
+        run: |
+          test -f donor/MtkSystemUI.apk || { echo "donor/MtkSystemUI.apk is missing"; exit 1; }
+          mkdir -p out
+          python3 tools/graft_sig.py app/build/outputs/apk/debug/app-debug.apk donor/MtkSystemUI.apk out/Luma-system.apk
+      - uses: actions/upload-artifact@v4
+        with: { name: Luma-apk, path: out/Luma-system.apk }
