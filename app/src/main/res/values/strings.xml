@@ -1,0 +1,5 @@
+<resources>
+    <string name="a11y_desc">מפעיל את הפעולות שבחרת בלחיצה על כפתור המצלמה ועל מקש הבית שמתחת למסך. להכתבה קולית הוא בודק רק אם הסמן נמצא בשדה טקסט, בלי לקרוא את התוכן. השירות לא אוסף ולא שומר מידע.</string>
+    <string name="sc_torch">פנס</string>
+    <string name="sc_blink">הבהוב</string>
+</resources>

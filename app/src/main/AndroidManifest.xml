@@ -1,0 +1,108 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"/>
+    <!-- "היי עזר": פתיחת החלונית מהרקע (אנדרואיד חוסם אחרת). signature — ניתנת בזכות חתימת המערכת, לא privileged -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <!-- הקלדה קולית: מיקרופון (הרשאת ריצה) -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <!-- הרשאות privileged: פועלות רק אם עזרים מותקנת כ-priv-app עם קובץ אישור הרשאות מתאים בקושחה -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"/>
+    <uses-permission android:name="android.permission.CHANGE_COMPONENT_ENABLED_STATE"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <!-- אריח "הוצא": חייב להיות רשום גם ב-privapp-permissions-ezrim.xml בקושחה, אחרת המכשיר לא עולה -->
+    <uses-permission android:name="android.permission.MOUNT_UNMOUNT_FILESYSTEMS"/>
+    <!-- מיקום מדומה: הרשאת signature (חתימת מערכת) -->
+    <uses-permission android:name="android.permission.MANAGE_APP_OPS_MODES"/>
+    <!-- כפתור המצלמה כשהמסך כבוי (מאזין מקשי מדיה): signature|privileged — חייב להיות רשום גם ב-privapp-permissions-ezrim.xml בקושחה -->
+    <uses-permission android:name="android.permission.SET_MEDIA_KEY_LISTENER"/>
+    <!-- העוזר הקולי: הרשאות רגילות/ריצה (לא privileged — לא דורשות שינוי בקובץ ההרשאות) -->
+    <!-- הגדרת עזרים כעוזר המערכת: signature|installer (בלי privileged) — ניתנת אוטומטית בזכות חתימת המערכת, בלי קובץ ההרשאות -->
+    <uses-permission android:name="android.permission.MANAGE_ROLE_HOLDERS"/>
+    <!-- פקודות מערכת של עזר: בלוטוס, בהירות וסיבוב (WRITE_SETTINGS: signature — ניתנת בזכות חתימת המערכת) -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+    <uses-permission android:name="android.permission.WRITE_SETTINGS"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM"/>
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
+    <uses-feature android:name="android.hardware.camera.flash" android:required="true"/>
+    <queries>
+        <intent><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent>
+        <!-- בלי זה מנוע ההקראה של גוגל לא "נראה" לעזרים (אנדרואיד 11+), ולכן נראה כאילו אין קול עברי -->
+        <intent><action android:name="android.intent.action.TTS_SERVICE"/></intent>
+        <package android:name="com.google.android.tts"/>
+    </queries>
+    <application android:name=".LumaApp" android:label="עזרים" android:supportsRtl="true"
+        android:dataExtractionRules="@xml/backup_rules_31" android:fullBackupContent="@xml/backup_rules_29" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher" android:theme="@android:style/Theme.Material.NoActionBar">
+        <activity android:name=".MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts"/>
+        </activity>
+        <activity android:name=".FlashActivity" android:exported="false"/>
+        <activity android:name=".CameraButtonActivity" android:exported="false"/>
+        <activity android:name=".SystemSettingsActivity" android:exported="false"/>
+        <activity android:name=".ShortcutsActivity" android:exported="false"/>
+        <activity android:name=".HomeKeyActivity" android:exported="false"/>
+        <activity android:name=".CameraActionActivity" android:exported="false"/>
+        <activity android:name=".BtAddressActivity" android:exported="false"/>
+        <activity android:name=".HideIconActivity" android:exported="false"/>
+        <activity android:name=".SettingsActivity" android:exported="false"/>
+        <activity android:name=".assistant.AssistantActivity" android:exported="false"/>
+        <activity android:name=".assistant.ChatActivity" android:exported="false" android:windowSoftInputMode="adjustResize"/>
+        <activity android:name=".assistant.ChatHistoryActivity" android:exported="false"/>
+        <!-- "היי עזר": האזנה ברקע (רק כשהמשתמש הפעיל את המתג) -->
+        <service android:name=".assistant.HotwordService" android:exported="false" android:foregroundServiceType="microphone"/>
+        <!-- גישה להתראות — רק לזיהוי השיר שמתנגן -->
+        <service android:name=".assistant.MediaListener" android:exported="true" android:label="עזר – מה מתנגן"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter><action android:name="android.service.notification.NotificationListenerService"/></intent-filter>
+        </service>
+        <!-- חלונית העוזר: עוזר המערכת (ASSIST) ופקודה קולית -->
+        <activity android:name=".assistant.AssistActivity" android:exported="true" android:excludeFromRecents="true" android:taskAffinity=""
+            android:launchMode="singleTask" android:theme="@android:style/Theme.Translucent.NoTitleBar" android:windowSoftInputMode="adjustResize">
+            <intent-filter><action android:name="android.intent.action.ASSIST"/><category android:name="android.intent.category.DEFAULT"/></intent-filter>
+            <intent-filter><action android:name="android.intent.action.VOICE_COMMAND"/><category android:name="android.intent.category.DEFAULT"/></intent-filter>
+        </activity>
+        <receiver android:name=".assistant.ReminderReceiver" android:exported="false"/>
+        <activity android:name=".CustomizationActivity" android:exported="false"/>
+        <activity android:name=".MockLocationActivity" android:exported="false"/>
+        <activity android:name=".dictation.DictationActivity" android:exported="false" android:windowSoftInputMode="adjustResize"/>
+        <activity android:name=".dictation.DictionaryActivity" android:exported="false" android:windowSoftInputMode="adjustResize"/>
+        <activity android:name=".dictation.DictationLegalActivity" android:exported="false"/>
+        <activity android:name=".ActionActivity" android:exported="true" android:excludeFromRecents="true"
+            android:taskAffinity="" android:theme="@android:style/Theme.Translucent.NoTitleBar"/>
+        <receiver android:name=".BootReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+            </intent-filter>
+        </receiver>
+        <service android:name=".CameraButtonService" android:exported="true" android:label="עזרים - קיצורים"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter><action android:name="android.accessibilityservice.AccessibilityService"/></intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/a11y"/>
+        </service>
+        <service android:name=".dictation.VoiceKeyboardService" android:exported="true" android:label="עזרים – הקלדה קולית"
+            android:permission="android.permission.BIND_INPUT_METHOD">
+            <intent-filter><action android:name="android.view.InputMethod"/></intent-filter>
+            <meta-data android:name="android.view.im" android:resource="@xml/voice_ime"/>
+        </service>
+        <service android:name=".FlashService" android:exported="false" android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="shake_to_toggle_flashlight"/>
+        </service>
+        <service android:name=".FlashTile" android:exported="true" android:label="פנס" android:icon="@drawable/ic_flash"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE"/></intent-filter>
+        </service>
+        <service android:name=".EjectTile" android:exported="true" android:label="הוצא" android:icon="@drawable/ic_eject"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE"/></intent-filter>
+        </service>
+    </application>
+</manifest>

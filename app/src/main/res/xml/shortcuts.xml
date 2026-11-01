@@ -1,0 +1,8 @@
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="torch" android:icon="@drawable/ic_launcher" android:shortcutShortLabel="@string/sc_torch">
+        <intent android:action="app.luma.torch.TORCH" android:targetPackage="com.android.adds" android:targetClass="app.luma.torch.ActionActivity"/>
+    </shortcut>
+    <shortcut android:shortcutId="blink" android:icon="@drawable/ic_launcher" android:shortcutShortLabel="@string/sc_blink">
+        <intent android:action="app.luma.torch.BLINK" android:targetPackage="com.android.adds" android:targetClass="app.luma.torch.ActionActivity"/>
+    </shortcut>
+</shortcuts>
