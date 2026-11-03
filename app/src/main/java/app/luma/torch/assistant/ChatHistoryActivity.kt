@@ -9,10 +9,11 @@ import java.util.*
 
 // היסטוריית השיחות עם עזר
 class ChatHistoryActivity : BaseActivity() {
-    override fun onCreate(b: Bundle?) { super.onCreate(b); build() }
+    // מסך הכניסה לעזר: השיחות האחרונות (מתעדכן בכל חזרה למסך)
+    override fun onResume() { super.onResume(); build() }
 
     private fun build() {
-        val newChat = tv("+ שיחה חדשה") { startActivity(Intent(this, ChatActivity::class.java).putExtra("new", true)); finish() }
+        val newChat = tv("+ שיחה חדשה") { startActivity(Intent(this, ChatActivity::class.java).putExtra("new", true)) }
         style(newChat, true)
         newChat.layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) }
         val fmt = SimpleDateFormat("EEEE · HH:mm", Locale("he"))
@@ -22,7 +23,7 @@ class ChatHistoryActivity : BaseActivity() {
                 layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) }
                 addView(TextView(this@ChatHistoryActivity).apply { text = ch.title; textSize = 15f; setTextColor(fg); typeface = medium; maxLines = 1 })
                 addView(TextView(this@ChatHistoryActivity).apply { text = fmt.format(Date(ch.updated)); textSize = 12f; setTextColor(dim) })
-                setOnClickListener { startActivity(Intent(this@ChatHistoryActivity, ChatActivity::class.java).putExtra("id", ch.id)); finish() }
+                setOnClickListener { startActivity(Intent(this@ChatHistoryActivity, ChatActivity::class.java).putExtra("id", ch.id)) }
                 setOnLongClickListener {
                     dlg().setMessage("למחוק את השיחה?").setPositiveButton("מחיקה") { _, _ -> ChatStore.delete(this@ChatHistoryActivity, ch.id); build() }
                         .setNegativeButton("ביטול", null).show(); true
@@ -30,6 +31,11 @@ class ChatHistoryActivity : BaseActivity() {
             }
         }
         val note = TextView(this).apply { text = if (items.isEmpty()) "אין עדיין שיחות" else "לחיצה ארוכה על שיחה — מחיקה"; textSize = 12f; setTextColor(dim); gravity = android.view.Gravity.CENTER }
-        page(header("שיחות"), newChat, *items.toTypedArray(), note)
+        val gear = ImageView(this).apply {
+            setImageDrawable(icon(app.luma.torch.R.drawable.ic_settings, dim)); setPadding(dp(9), dp(9), dp(9), dp(9)); background = shape(card, 14, line)
+            layoutParams = LinearLayout.LayoutParams(dp(40), dp(40))
+            setOnClickListener { startActivity(Intent(this@ChatHistoryActivity, AssistantActivity::class.java)) }
+        }
+        page(header(Assistant.NAME, gear, "שיחות אחרונות"), newChat, *items.toTypedArray(), note)
     }
 }

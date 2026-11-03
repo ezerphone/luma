@@ -21,9 +21,6 @@ object ChatStore {
         Chat(id, o.optString("title"), o.optLong("updated"), (0 until a.length()).map { a.getJSONObject(it).let { m -> Msg(m.getBoolean("me"), m.getString("x"), m.getLong("t")) } }.toMutableList())
     } catch (_: Exception) { null }
 
-    // השיחה הנוכחית: האחרונה אם עודכנה בחצי השעה האחרונה, אחרת חדשה (משותף לצ'אט, לחלונית ול"היי עזר")
-    fun current(c: Context): Chat = list(c).firstOrNull()?.takeIf { System.currentTimeMillis() - it.updated < 30 * 60_000 } ?: create()
-
     // מוסיף הודעה לפי מה ששמור בקובץ (ולא רק בזיכרון) — כך הצ'אט והחלונית לא דורסים זה את זה
     @Synchronized fun add(c: Context, ch: Chat, me: Boolean, text: String) {
         load(c, ch.id)?.let { d -> if (d.msgs.size > ch.msgs.size) { ch.msgs.clear(); ch.msgs += d.msgs }; if (ch.title.isBlank()) ch.title = d.title }

@@ -29,15 +29,15 @@ class ChatActivity : BaseActivity(), Listen.Callback {
         super.onCreate(b)
         Voice.init(this)
         chat = intent.getStringExtra("id")?.let { ChatStore.load(this, it) }
-            ?: if (intent.getBooleanExtra("new", false)) ChatStore.create()
-            else ChatStore.current(this)
+            ?: ChatStore.create()   // בלי מזהה — תמיד שיחה חדשה
 
         fun iconBox(res: Int, click: () -> Unit) = ImageView(this).apply {
             setImageDrawable(icon(res, dim)); setPadding(dp(9), dp(9), dp(9), dp(9)); background = shape(card, 14, line); setOnClickListener { click() }
         }
         val top = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL; setPadding(dp(16), dp(40), dp(16), dp(10))
-            addView(iconBox(R.drawable.ic_menu) { startActivity(Intent(this@ChatActivity, ChatHistoryActivity::class.java)); finish() }, LinearLayout.LayoutParams(dp(40), dp(40)))
+            addView(iconBox(R.drawable.ic_menu) {
+                startActivity(Intent(this@ChatActivity, ChatHistoryActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)); finish() }, LinearLayout.LayoutParams(dp(40), dp(40)))
             addView(TextView(this@ChatActivity).apply { text = Assistant.NAME; textSize = 24f; setTextColor(fg); typeface = android.graphics.Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER },
                 LinearLayout.LayoutParams(0, -2, 1f))
             addView(iconBox(R.drawable.ic_settings) { startActivity(Intent(this@ChatActivity, AssistantActivity::class.java)) }, LinearLayout.LayoutParams(dp(40), dp(40)))

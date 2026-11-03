@@ -18,12 +18,16 @@ object PushToTalk {
     // מה עושים בסיום: בדרך כלל חזרה למקלדת הקודמת (null אם המקלדת הקולית כבר הייתה פתוחה מלכתחילה)
     private var onDone: (() -> Unit)? = null
 
-    fun begin(after: (() -> Unit)?) { active = true; onDone = after }
+    // תצוגת "מקשיב" ליד כפתור המצלמה (שירות הנגישות מציג/מסתיר)
+    var indicator: ((Boolean) -> Unit)? = null
+
+    fun begin(after: (() -> Unit)?) { active = true; onDone = after; indicator?.invoke(true) }
 
     fun done() {
         if (!active) return
         val d = onDone
         active = false; onDone = null
+        indicator?.invoke(false)
         d?.invoke()
     }
 }

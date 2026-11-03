@@ -74,6 +74,7 @@ class MainActivity : BaseActivity() {
         try { app.luma.torch.dictation.VoiceIme.ensureDefault(this) } catch (_: Exception) {}
         try { app.luma.torch.assistant.Assistant.ensureDefault(this) } catch (_: Exception) {}
         try { app.luma.torch.assistant.Hotword.sync(this) } catch (_: Exception) {}
+        try { app.luma.torch.assistant.TtsRestore.ensure(this) } catch (_: Exception) {} // קול עברי ל-Google TTS, אם חסר
         val btCard = big(R.drawable.ic_bluetooth, "כתובת בלוטוס", "שינוי כתובת MAC (דורש root)", BtAddressActivity::class.java)
         val sysCard = big(R.drawable.ic_statusbar, "הגדרות מערכת", "כפתור סיבוב, עיצוב הסטטוס בר וקיצורים", SystemSettingsActivity::class.java)
         val hideCard = big(R.drawable.ic_hide, "הסתרת אייקונים", "הסתרת אייקון של אפליקציה ממסך הבית", HideIconActivity::class.java)
@@ -84,7 +85,7 @@ class MainActivity : BaseActivity() {
             hero(),
             big(R.drawable.ic_flash, "פנס", "הדלקה, הבהוב, כיבוי אוטומטי וניעור", FlashActivity::class.java),
             big(R.drawable.ic_shortcuts, "קיצורים", "כפתור המצלמה ומקש הבית", ShortcutsActivity::class.java),
-            big(R.drawable.ic_assist, "עזר", "העוזר הקולי: אפליקציות, תזכורות, זמני היום ועוד", app.luma.torch.assistant.ChatActivity::class.java,
+            big(R.drawable.ic_assist, "עזר", "העוזר הקולי: אפליקציות, תזכורות, זמני היום ועוד", app.luma.torch.assistant.ChatHistoryActivity::class.java,
                 "מודל זיהוי הדיבור לא נמצא בקושחה") { ModelLocator.isInstalled() },
             big(R.drawable.ic_mic, "הקלדה קולית", "הכתבה בעברית בלי אינטרנט, בכל שדה טקסט", DictationActivity::class.java,
                 "מודל זיהוי הדיבור לא נמצא בקושחה") { ModelLocator.isInstalled() },

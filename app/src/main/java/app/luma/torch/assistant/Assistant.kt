@@ -114,16 +114,16 @@ object Assistant {
         val today = LocalDate.now()
         return when (u.intent) {
             // מכשיר
-            "flashlight_on" -> { Torch.set(true); Reply(if (Torch.busy) "הפנס תפוס כרגע על ידי המצלמה" else "הפנס דלוק") }
+            "flashlight_on" -> { Torch.set(true); Reply(if (Torch.busy) "הפנס תפוס כרגע על ידי המצלמה" else "הדלקתי את הפנס") }
             "flashlight_off" -> { Torch.set(false); Reply("כיביתי את הפנס") }
             "battery" -> battery(c)
             "storage_query" -> storage()
             "ringer_silent" -> ringer(c, AudioManager.RINGER_MODE_SILENT, "עברתי למצב שקט")
             "ringer_vibrate" -> ringer(c, AudioManager.RINGER_MODE_VIBRATE, "עברתי לרטט")
-            "ringer_normal" -> ringer(c, AudioManager.RINGER_MODE_NORMAL, "הצלצול חזר")
-            "volume_up" -> volume(c, AudioManager.ADJUST_RAISE, "הגברתי")
-            "volume_down" -> volume(c, AudioManager.ADJUST_LOWER, "הנמכתי")
-            "volume_mute" -> { c.getSystemService(AudioManager::class.java).adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_MUTE, 0); Reply("השתקתי") }
+            "ringer_normal" -> ringer(c, AudioManager.RINGER_MODE_NORMAL, "החזרתי את הצלצול")
+            "volume_up" -> volume(c, AudioManager.ADJUST_RAISE, "הגברתי את הווליום")
+            "volume_down" -> volume(c, AudioManager.ADJUST_LOWER, "הנמכתי את הווליום")
+            "volume_mute" -> { c.getSystemService(AudioManager::class.java).adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_MUTE, 0); Reply("השתקתי את הצליל") }
             "volume_set" -> volumeSet(c, u.number)
             "brightness_up" -> brightness(c, +60); "brightness_down" -> brightness(c, -60)
             "brightness_set" -> brightnessSet(c, u.number)
@@ -136,20 +136,20 @@ object Assistant {
             "open_app" -> Reply("איזו אפליקציה לפתוח?")
             "navigate" -> navigate(c, u.text)
             // מסך
-            "nav_home" -> global(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME)
-            "nav_back" -> global(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
-            "nav_recents" -> global(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_RECENTS)
-            "nav_notifications" -> global(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS)
-            "nav_quick_settings" -> global(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_QUICK_SETTINGS)
-            "screenshot" -> global(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_TAKE_SCREENSHOT)
-            "lock_screen" -> global(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN)
-            "power_menu" -> global(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_POWER_DIALOG)
-            "split_screen" -> global(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_TOGGLE_SPLIT_SCREEN)
+            "nav_home" -> global(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME, "חוזר למסך הבית")
+            "nav_back" -> global(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK, "חוזר אחורה")
+            "nav_recents" -> global(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_RECENTS, "פותח את האפליקציות האחרונות")
+            "nav_notifications" -> global(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS, "פותח את ההתראות")
+            "nav_quick_settings" -> global(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_QUICK_SETTINGS, "פותח את ההגדרות המהירות")
+            "screenshot" -> global(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_TAKE_SCREENSHOT, "מצלם את המסך")
+            "lock_screen" -> global(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN, "נועל את המסך")
+            "power_menu" -> global(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_POWER_DIALOG, "פותח את תפריט הכיבוי")
+            "split_screen" -> global(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_TOGGLE_SPLIT_SCREEN, "מפצל את המסך")
             // מדיה
-            "media_pause" -> media(c, KeyEvent.KEYCODE_MEDIA_PAUSE, "עצרתי")
-            "media_play" -> media(c, KeyEvent.KEYCODE_MEDIA_PLAY, "ממשיך")
-            "media_next" -> media(c, KeyEvent.KEYCODE_MEDIA_NEXT, "הבא")
-            "media_prev" -> media(c, KeyEvent.KEYCODE_MEDIA_PREVIOUS, "הקודם")
+            "media_pause" -> media(c, KeyEvent.KEYCODE_MEDIA_PAUSE, "עצרתי את המוזיקה")
+            "media_play" -> media(c, KeyEvent.KEYCODE_MEDIA_PLAY, "ממשיך לנגן")
+            "media_next" -> media(c, KeyEvent.KEYCODE_MEDIA_NEXT, "העברתי לשיר הבא")
+            "media_prev" -> media(c, KeyEvent.KEYCODE_MEDIA_PREVIOUS, "חזרתי לשיר הקודם")
             "play_song" -> song(c, u.text, u.artist)
             "now_playing" -> nowPlaying(c)
             "sleep_timer" -> { val d = u.duration ?: Duration.ofMinutes(30); schedule(c, LocalDateTime.now().plus(d), "", pause = true); Reply("המוזיקה תיעצר בעוד ${say(d)}") }
@@ -348,7 +348,7 @@ object Assistant {
         val am = c.getSystemService(AudioManager::class.java)
         val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
         am.setStreamVolume(AudioManager.STREAM_MUSIC, (max * pct.coerceIn(0.0, 100.0) / 100).toInt(), AudioManager.FLAG_SHOW_UI)
-        return Reply("הווליום על ${pct.toInt()}%")
+        return Reply("העברתי את הווליום ל-${pct.toInt()}%")
     }
 
     private fun sysSet(c: Context, key: String, v: Int, ok: String): Reply =
@@ -366,23 +366,23 @@ object Assistant {
         return try {
             Settings.System.putInt(c.contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE, 0)
             Settings.System.putInt(c.contentResolver, Settings.System.SCREEN_BRIGHTNESS, (255 * pct.coerceIn(1.0, 100.0) / 100).toInt())
-            Reply("הבהירות על ${pct.toInt()}%")
+            Reply("העברתי את הבהירות ל-${pct.toInt()}%")
         } catch (_: Exception) { Reply(Say.NO_PERMISSION) }
     }
 
     private fun bluetooth(c: Context, on: Boolean): Reply {
         @Suppress("DEPRECATION", "MissingPermission")
         val ok = try { val a = android.bluetooth.BluetoothAdapter.getDefaultAdapter(); if (on) a.enable() else a.disable() } catch (_: Exception) { false }
-        return if (ok) Reply(if (on) "הדלקתי בלוטוס" else "כיביתי בלוטוס") else start(c, Intent(Settings.ACTION_BLUETOOTH_SETTINGS), "פותח את הגדרות הבלוטוס")
+        return if (ok) Reply(if (on) "הדלקתי את הבלוטוס" else "כיביתי את הבלוטוס") else start(c, Intent(Settings.ACTION_BLUETOOTH_SETTINGS), "פותח את הגדרות הבלוטוס")
     }
 
     private fun start(c: Context, i: Intent, ok: String): Reply = Reply(ok, then = {
         try { c.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) {}
     })
 
-    private fun global(action: Int): Reply {
+    private fun global(action: Int, ok: String): Reply {
         val svc = app.luma.torch.CameraButtonService.instance ?: return Reply(Say.NEED_A11Y)
-        return Reply("", then = { svc.performGlobalAction(action) })
+        return Reply(ok, then = { svc.performGlobalAction(action) })
     }
 
     // ---------- מדיה ----------

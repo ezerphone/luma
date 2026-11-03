@@ -43,9 +43,12 @@ class CameraButtonService : AccessibilityService() {
             private set
     }
 
+    private val edgeMic by lazy { app.luma.torch.dictation.EdgeMic(this) }
+
     override fun onServiceConnected() {
         Torch.init(this)
         instance = this
+        PushToTalk.indicator = { on -> h.post { if (on) edgeMic.show() else edgeMic.hide() } }
         registerMediaKeyListener()
     }
 
@@ -107,7 +110,7 @@ class CameraButtonService : AccessibilityService() {
     }
     override fun onAccessibilityEvent(e: AccessibilityEvent?) {}
     override fun onInterrupt() {}
-    override fun onDestroy() { if (instance === this) instance = null; unregisterMediaKeyListener(); h.removeCallbacksAndMessages(null); super.onDestroy() }
+    override fun onDestroy() { if (instance === this) instance = null; PushToTalk.indicator = null; edgeMic.hide(); unregisterMediaKeyListener(); h.removeCallbacksAndMessages(null); super.onDestroy() }
 
     private val longRun = Runnable {
         longFired = true

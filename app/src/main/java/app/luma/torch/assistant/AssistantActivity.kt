@@ -47,9 +47,17 @@ class AssistantActivity : BaseActivity() {
 
         val speak = sw("הקראת תשובות", "speak", true)
         voiceText = info()
+        // מתקין את הקול העברי מהקושחה ל-Google TTS (דורש root)
         voiceBtn = tv("התקנת קול עברי") {
-            try { startActivity(Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA).setPackage("com.google.android.tts")) }
-            catch (_: Exception) { try { startActivity(Intent("com.android.settings.TTS_SETTINGS")) } catch (_: Exception) {} }
+            voiceBtn.isEnabled = false; voiceBtn.text = "מתקין…"
+            TtsRestore.install(this) { r ->
+                voiceBtn.isEnabled = true; voiceBtn.text = "התקנת קול עברי"
+                when (r) {
+                    TtsRestore.Result.OK -> { voiceText.text = "מתקין… רגע"; Handler(Looper.getMainLooper()).postDelayed({ refresh() }, 2500) }
+                    TtsRestore.Result.NO_ROOT -> voiceText.text = "אין הרשאת root להתקנת הקול"
+                    TtsRestore.Result.FAIL -> voiceText.text = "התקנת הקול נכשלה"
+                }
+            }
         }
         style(voiceBtn, false)
         testBtn = tv("השמעת דוגמה") { Voice.recheck(this); Handler(Looper.getMainLooper()).postDelayed({ refresh(); Voice.speak(this, "שלום, אני עזר") }, 1500) }
@@ -79,7 +87,7 @@ class AssistantActivity : BaseActivity() {
     private fun refresh() {
         voiceText.text = if (Voice.hebrew) "קול עברי זמין ✓" else "לא נמצא קול עברי להקראה"
         voiceText.setTextColor(if (Voice.hebrew) acc else dim)
-        voiceBtn.visibility = View.GONE
+        voiceBtn.visibility = if (!Voice.hebrew && TtsRestore.available(this)) View.VISIBLE else View.GONE
         testBtn.visibility = if (Voice.hebrew) View.VISIBLE else View.GONE
         val def = Assistant.isDefault(this)
         roleText.text = if (def) "${Assistant.NAME} מוגדר כעוזר המערכת ✓" else "${Assistant.NAME} יוגדר כעוזר המערכת אוטומטית באתחול הבא"
