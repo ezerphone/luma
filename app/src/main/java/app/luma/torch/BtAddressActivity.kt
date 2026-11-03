@@ -96,7 +96,7 @@ class BtAddressActivity : BaseActivity() {
                     code == 0 -> show("הכתובת הוגדרה ל-$mac והבלוטוס הופעל מחדש. אם הכתובת לא השתנתה, הפעל מחדש את המכשיר.", acc)
                     out.contains("not found", true) || out.contains("denied", true) || code == -1 ->
                         show("לא נמצאה גישת root או שהיא נדחתה. אשר הרשאת root לאפליקציה ונסה שוב.", warnC)
-                    else -> show("הפקודה נכשלה (קוד $code). ייתכן שהמכשיר לא תומך בשינוי כזה.", warnC)
+                    else -> show("הפעולה נכשלה. ייתכן שהמכשיר לא תומך בשינוי כזה.", warnC)
                 }
             }
         }.start()

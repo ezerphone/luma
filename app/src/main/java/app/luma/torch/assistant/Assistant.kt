@@ -99,7 +99,20 @@ object Assistant {
     private val OPEN_VERBS = listOf("תפתח", "תפתחי", "פתח", "פתחי", "לפתוח", "תיכנס", "תכנס", "כנס", "היכנס", "להיכנס", "תפעיל", "הפעל", "תריץ", "תקפיץ")
         .map { IntentEngine.n(it) }.toSet()
 
+    // "כבה עוזר קולי" / "כבה היי עזר": מכבה את כל המתגים של "היי עזר" ועוצר את ההאזנה ברקע
+    private val OFF_VERBS = listOf("כבה", "תכבה", "לכבות", "תכבי", "כבי", "בטל", "תבטל", "הפסק", "תפסיק").map { IntentEngine.n(it) }
+    private val HOT_WORDS = listOf("עוזר קולי", "העוזר הקולי", "היי עזר", "האזנה", "ההאזנה").map { IntentEngine.n(it) }
+    private fun hotwordOff(c: Context, said: String): Reply? {
+        val t = IntentEngine.n(said)
+        if (OFF_VERBS.none { v -> t.split(' ').contains(v) } || HOT_WORDS.none { t.contains(it) }) return null
+        prefs(c).edit().putBoolean("hotword", false).putBoolean("hotword_charging", false)
+            .putBoolean("hotword_locked", false).putBoolean("hotword_off", false).apply()
+        Hotword.sync(c)
+        return Reply("כיביתי את העוזר הקולי. אפשר להפעיל אותו מחדש בהגדרות עזר")
+    }
+
     fun handle(c: Context, said: String): Reply {
+        hotwordOff(c, said)?.let { return it }
         val r = engine(c).classify(said)
         if (r.label in REMOVED && r.prob >= 0.35f) return Reply(Say.NOT_SUPPORTED)
         val first = IntentEngine.n(said).split(' ').firstOrNull { it !in IntentEngine.FILLER }

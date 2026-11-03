@@ -36,10 +36,9 @@ class VoiceKeyboardService : InputMethodService(), SpeechEngine.Observer, PushTo
     private var delIcon: Icon? = null
     private var kbIcon: Icon? = null
     private var cogIcon: Icon? = null
-    // הכתבה מכפתור המצלמה: במקום הסרגל — גלולה קטנה "מקשיב" עם גל קול
-    private var ptt: LinearLayout? = null
-    private var pttText: TextView? = null
-    private var pttWave: PttWave? = null
+    private var gripView: View? = null
+    private var gripRow: View? = null
+    private var spacer: View? = null
     private var password = false
     private var note: String? = null
     private var prefix = ""          // רווח לפני המילים החדשות, אם התו שלפני הסמן אינו רווח
@@ -85,30 +84,45 @@ class VoiceKeyboardService : InputMethodService(), SpeechEngine.Observer, PushTo
 
     override fun onEvaluateFullscreenMode() = false
 
-    // במצב כפתור המצלמה הגלולה "צפה" מעל האפליקציה: המקלדת לא דוחפת את התוכן למעלה, ואין בה אזור לחיצה
+    // אזור הלחיצה הוא רק הסרגל עצמו. סרגל שהוזז למעלה "צף" מעל האפליקציה (לא דוחף את התוכן);
+    // בהכתבה מכפתור המצלמה המקלדת כמעט בלתי נראית — הסימון "מקשיב" מוצג ליד הכפתור
     override fun onComputeInsets(outInsets: Insets) {
         super.onComputeInsets(outInsets)
         val r = root ?: return
-        if (!PushToTalk.active || r.height == 0) return
+        val p = pill ?: return
         val full = window?.window?.decorView?.height ?: return
-        outInsets.contentTopInsets = full
-        outInsets.visibleTopInsets = full
+        if (r.height == 0) return
+        val floating = PushToTalk.active || barOffset() > 0
+        val top = if (floating) full else full - r.height + p.top
+        outInsets.contentTopInsets = top
+        outInsets.visibleTopInsets = top
         outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_REGION
-        outInsets.touchableRegion.setEmpty()
+        if (PushToTalk.active) outInsets.touchableRegion.setEmpty()
+        else {
+            val loc = IntArray(2); p.getLocationInWindow(loc)
+            outInsets.touchableRegion.set(loc[0], loc[1] - dp(14f).toInt(), loc[0] + p.width, loc[1] + p.height)
+        }
     }
 
+    // הזזת הסרגל: המרחק מתחתית המסך (נשמר בהגדרות)
+    private fun barOffset() = DictationPrefs.prefs(this).getInt("bar_offset", 0)
+
     override fun onCreateInputView(): View {
-        val side = dp(12f).toInt()
+        val side = dp(10f).toInt()
+        // הסרגל: גלולה צפה ועגולה עם צל רך — מיקרופון · מקלדת · סטטוס + גל קול · מחיקה · הגדרות
         val r = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             layoutDirection = View.LAYOUT_DIRECTION_LTR
-            setPadding(side, dp(8f).toInt(), side, dp(10f).toInt())
+            setPadding(side, dp(14f).toInt(), side, dp(10f).toInt())
+            clipToPadding = false; clipChildren = false
         }
         val p = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
             layoutDirection = View.LAYOUT_DIRECTION_LTR
             setPadding(dp(6f).toInt(), 0, dp(6f).toInt(), 0)
+            elevation = dp(4f)
         }
-        val box = dp(48f).toInt()
+        val box = dp(44f).toInt()
 
         val mic = Icon(Kind.MIC).apply { setOnClickListener { onMic() } }
         val del = Icon(Kind.BACKSPACE).apply {
@@ -125,8 +139,10 @@ class VoiceKeyboardService : InputMethodService(), SpeechEngine.Observer, PushTo
                 true
             }
         }
+        // גופן רגיל של המערכת (כמו בהדגמה), בלי גל קול ליד הסטטוס
         val st = TextView(this).apply {
-            textSize = 18f; gravity = Gravity.CENTER; maxLines = 1; textDirection = View.TEXT_DIRECTION_RTL
+            textSize = 16f; gravity = Gravity.CENTER; maxLines = 1; textDirection = View.TEXT_DIRECTION_RTL
+            typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL)
         }
         val kb = Icon(Kind.KEYBOARD).apply { setOnClickListener { backToKeyboard() } }
         val cog = Icon(Kind.SETTINGS).apply { setOnClickListener { openSetup() } } // הגדרות ההקלדה הקולית בעזרים
@@ -136,25 +152,35 @@ class VoiceKeyboardService : InputMethodService(), SpeechEngine.Observer, PushTo
         p.addView(st, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
         p.addView(del, LinearLayout.LayoutParams(box, box))
         p.addView(cog, LinearLayout.LayoutParams(box, box))
-        r.addView(p, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(56f).toInt()))
 
-        // הגלולה של כפתור המצלמה
-        val dot = View(this).apply { background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(0xFFFF4D4D.toInt()) } }
-        val pt = TextView(this).apply { textSize = 17f; setTextColor(0xFFFFFFFF.toInt()); text = "מקשיב" }
-        val pw = PttWave()
-        val g = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL
-            background = GradientDrawable().apply { cornerRadius = dp(24f); setColor(0xFF202124.toInt()) }
-            elevation = dp(6f); setPadding(dp(18f).toInt(), 0, dp(18f).toInt(), 0); visibility = View.GONE
-            addView(dot, LinearLayout.LayoutParams(dp(11f).toInt(), dp(11f).toInt()).apply { marginEnd = dp(10f).toInt() })
-            addView(pt)
-            addView(pw, LinearLayout.LayoutParams(dp(40f).toInt(), dp(24f).toInt()).apply { marginStart = dp(10f).toInt() })
+        // פס קטן בראש הסרגל לגרירה למעלה/למטה
+        val grip = View(this)
+        val gripBox = android.widget.FrameLayout(this).apply {
+            addView(grip, android.widget.FrameLayout.LayoutParams(dp(28f).toInt(), dp(3f).toInt(), Gravity.CENTER))
+            setOnTouchListener(object : View.OnTouchListener {
+                var y0 = 0f; var o0 = 0
+                override fun onTouch(v: View, e: MotionEvent): Boolean {
+                    when (e.actionMasked) {
+                        MotionEvent.ACTION_DOWN -> { y0 = e.rawY; o0 = barOffset() }
+                        MotionEvent.ACTION_MOVE, MotionEvent.ACTION_UP -> {
+                            val max = (resources.displayMetrics.heightPixels * 0.55f).toInt()
+                            val o = (o0 + (y0 - e.rawY)).toInt().coerceIn(0, max)
+                            spacer?.layoutParams = spacer?.layoutParams?.apply { height = o }
+                            spacer?.requestLayout()
+                            if (e.actionMasked == MotionEvent.ACTION_UP) DictationPrefs.prefs(this@VoiceKeyboardService).edit().putInt("bar_offset", if (o < dp(16f)) 0 else o).apply()
+                        }
+                    }
+                    return true
+                }
+            })
         }
-        r.gravity = Gravity.CENTER
-        r.addView(g, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(48f).toInt()))
-        ptt = g; pttText = pt; pttWave = pw
+        val sp = View(this)
+        r.addView(gripBox, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(14f).toInt()))
+        r.addView(p, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(56f).toInt()))
+        r.addView(sp, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, barOffset()))
 
         root = r; pill = p; statusView = st; micIcon = mic; delIcon = del; kbIcon = kb; cogIcon = cog
+        gripView = grip; gripRow = gripBox; spacer = sp
         applyTheme(); render()
         return r
     }
@@ -308,12 +334,19 @@ class VoiceKeyboardService : InputMethodService(), SpeechEngine.Observer, PushTo
     private fun applyTheme() {
         val n = dark()
         val compact = PushToTalk.active
-        root?.setBackgroundColor(if (compact) 0 else if (n) 0xFF202124.toInt() else 0xFFF1F3F4.toInt())
-        try { window?.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(if (compact) 0 else if (n) 0xFF202124.toInt() else 0xFFF1F3F4.toInt())) } catch (_: Exception) {}
+        // הרקע של המקלדת שקוף: הסרגל צף
+        root?.background = null
+        try { window?.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(0)) } catch (_: Exception) {}
         pill?.background = GradientDrawable().apply {
-            cornerRadius = dp(28f); setColor(if (n) 0xFF3C4043.toInt() else 0xFFFFFFFF.toInt())
+            cornerRadius = dp(28f); setColor(if (n) 0xFF2D2F33.toInt() else 0xFFFFFFFF.toInt())
+            setStroke(dp(1f).toInt(), if (n) 0xFF3C4043.toInt() else 0xFFE3E6EA.toInt())
         }
+        gripView?.background = GradientDrawable().apply { cornerRadius = dp(2f); setColor(if (n) 0xFF5F6368.toInt() else 0xFFC4C7C5.toInt()) }
         statusView?.setTextColor(if (n) 0xFFE8EAED.toInt() else 0xFF202124.toInt())
+        // הכתבה מכפתור המצלמה: הסרגל מוסתר לגמרי (הסימון מוצג ליד הכפתור)
+        val vis = if (compact) View.GONE else View.VISIBLE
+        pill?.visibility = vis; gripRow?.visibility = vis; spacer?.visibility = vis
+        root?.setPadding(if (compact) 0 else dp(10f).toInt(), if (compact) 0 else dp(14f).toInt() - dp(14f).toInt(), if (compact) 0 else dp(10f).toInt(), if (compact) 0 else dp(10f).toInt())
         for (i in listOf(micIcon, delIcon, kbIcon, cogIcon)) i?.invalidate()
     }
 
@@ -331,13 +364,9 @@ class VoiceKeyboardService : InputMethodService(), SpeechEngine.Observer, PushTo
             else -> "בהשהיה"
         }
         statusView?.text = text
-        // מצב כפתור המצלמה: הסרגל מוסתר, הגלולה מוצגת והרקע שקוף
-        val compact = PushToTalk.active
-        pill?.visibility = if (compact) View.GONE else View.VISIBLE
-        ptt?.visibility = if (compact) View.VISIBLE else View.GONE
-        pttText?.text = when (s) { "listening" -> "מקשיב"; "finishing" -> "מסיים"; else -> "רגע…" }
-        pttWave?.active = compact && s == "listening"
+        val listening = s == "listening" && note == null && !password
         applyTheme()
+        if (!listening) statusView?.setTextColor(if (dark()) 0xFF9AA0A6.toInt() else 0xFF80868B.toInt())
         micIcon?.apply { alpha = if (password) 0.38f else 1f; contentDescription = if (engine.isListening) "סיום הכתבה" else "התחלת הכתבה"; invalidate() }
         delIcon?.apply { alpha = if (canDelete()) 1f else 0.38f; contentDescription = "מחיקה"; invalidate() }
         kbIcon?.apply { contentDescription = "חזרה למקלדת"; invalidate() }
@@ -359,10 +388,20 @@ class VoiceKeyboardService : InputMethodService(), SpeechEngine.Observer, PushTo
             fun y(v: Float) = oy + v * s
             val n = dark()
             var color = if (n) 0xFFE8EAED.toInt() else 0xFF202124.toInt()
-            if (kind == Kind.MIC && engine.isListening) {
-                fill.color = if (n) 0xFF8AB4F8.toInt() else 0xFF1A73E8.toInt()
-                canvas.drawCircle(width / 2f, height / 2f, 20 * s, fill)
-                color = if (n) 0xFF202124.toInt() else 0xFFFFFFFF.toInt()
+            if (kind != Kind.MIC) color = if (n) 0xFFBDC1C6.toInt() else 0xFF5F6368.toInt()
+            if (kind == Kind.MIC) {
+                val acc = if (n) 0xFF3DDCB4.toInt() else 0xFF0C9A82.toInt()
+                if (engine.isListening) {
+                    fill.color = acc; fill.alpha = 60
+                    canvas.drawCircle(width / 2f, height / 2f, 21.5f * s, fill)
+                    fill.alpha = 255
+                    canvas.drawCircle(width / 2f, height / 2f, 18 * s, fill)
+                    color = if (n) 0xFF0E1A1F.toInt() else 0xFFFFFFFF.toInt()
+                } else {
+                    fill.color = if (n) 0xFF1F3B36.toInt() else 0xFFE8F5F2.toInt()
+                    canvas.drawCircle(width / 2f, height / 2f, 18 * s, fill)
+                    color = acc
+                }
             }
             stroke.color = color; stroke.strokeWidth = 1.8f * s; fill.color = color
             when (kind) {
@@ -408,36 +447,5 @@ class VoiceKeyboardService : InputMethodService(), SpeechEngine.Observer, PushTo
                 }
             }
         }
-    }
-
-    // גל קול קטן באדום לגלולה של כפתור המצלמה
-    private inner class PttWave : View(this@VoiceKeyboardService) {
-        private val n = 6
-        private val cur = FloatArray(n) { 0.2f }
-        private val target = FloatArray(n) { 0.2f }
-        private val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFF8A80.toInt() }
-        private val rnd = java.util.Random()
-        private var frame = 0
-        private val anim = android.animation.ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 1000; repeatCount = android.animation.ValueAnimator.INFINITE
-            addUpdateListener {
-                if (++frame % 6 == 0) for (i in 0 until n) target[i] = if (active) 0.3f + rnd.nextFloat() * 0.7f else 0.2f
-                for (i in 0 until n) cur[i] += (target[i] - cur[i]) * 0.25f
-                invalidate()
-            }
-        }
-        var active = false
-            set(v) { field = v; if (v && !anim.isStarted) anim.start(); if (!v) { anim.cancel(); cur.fill(0.2f); invalidate() } }
-
-        override fun onDraw(c: Canvas) {
-            val bw = dp(4f); val gap = (width - n * bw) / (n - 1)
-            var x = 0f
-            for (i in 0 until n) {
-                val bh = maxOf(bw, cur[i] * height); val t = (height - bh) / 2
-                c.drawRoundRect(RectF(x, t, x + bw, t + bh), bw / 2, bw / 2, p)
-                x += bw + gap
-            }
-        }
-        override fun onDetachedFromWindow() { anim.cancel(); super.onDetachedFromWindow() }
     }
 }

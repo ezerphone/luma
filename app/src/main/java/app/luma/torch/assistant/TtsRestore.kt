@@ -6,7 +6,7 @@ import android.os.Looper
 import app.luma.torch.RootShell
 import java.io.File
 
-// קול עברי אופליין ל-Google TTS: הנתונים צרובים בקושחה — כתיקייה (/system/etc/ezrim/tts) או כקובץ ZIP אחד
+// קול עברי אופליין ל-Google TTS (מותקן רק בלחיצה על הכפתור בהגדרות עזר): הנתונים צרובים בקושחה — כתיקייה (/system/etc/ezrim/tts) או כקובץ ZIP אחד
 // (/system/etc/ezrim/tts_he.zip, חוסך "מקומות" של קבצים במחיצת המערכת) — ועזרים מעתיק אותם (עם root)
 // לתיקייה הפרטית של Google TTS — תיקיית הקולות (files/superpacks) וקובץ הרישום (databases/superpacks.db).
 object TtsRestore {
@@ -15,8 +15,7 @@ object TtsRestore {
     const val ZIP = "/system/etc/ezrim/tts_he.zip"
     private const val MARK = "he-il/he-il-x-multi-r8"
     enum class Result { OK, NO_ROOT, FAIL }
-    @Volatile private var running = false
-
+    
     private fun googleInstalled(c: Context) = try { c.packageManager.getPackageInfo(PKG, 0); true } catch (_: Exception) { false }
 
     // יש מה להתקין: הנתונים בקושחה ו-Google TTS מותקן
@@ -42,19 +41,6 @@ object TtsRestore {
         return if (File(stage, "superpacks/$MARK").isDirectory) stage.absolutePath else null
     }
 
-    // אוטומטי, בכניסה לעזרים: רק אם הקול חסר
-    fun ensure(c: Context) {
-        if (!available(c) || running) return
-        val app = c.applicationContext
-        running = true
-        Thread {
-            try {
-                val (code, out) = RootShell.run("[ -d /data/data/$PKG/files/superpacks/$MARK ] && echo HAVE || echo MISSING")
-                if (code == 0 && out.contains("MISSING")) copy(app)
-            } catch (_: Exception) {} finally { running = false }
-        }.start()
-    }
-
     // ידני, מהכפתור בהגדרות עזר
     fun install(c: Context, done: (Result) -> Unit) {
         val app = c.applicationContext
@@ -65,12 +51,11 @@ object TtsRestore {
     }
 
     private fun copy(c: Context): Result {
-        val (id, idOut) = RootShell.run("id")
-        if (id != 0 || !idOut.contains("uid=0")) return Result.NO_ROOT
+        if (!RootShell.hasRoot()) return Result.NO_ROOT
         val d = "/data/data/$PKG"
         val src = source(c) ?: return Result.FAIL
         val (code, _) = RootShell.run("""
-            [ -d $d ] || exit 3
+            [ -d $d ] || exit 3   # רץ בתת-מעטפת: לא סוגר את חיבור ה-root
             am force-stop $PKG
             U=${'$'}(stat -c %u $d); CTX=${'$'}(ls -Zd $d | awk '{print ${'$'}1}')
             mkdir -p $d/files $d/databases

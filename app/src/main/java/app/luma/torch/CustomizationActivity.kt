@@ -54,11 +54,8 @@ class CustomizationActivity : BaseActivity() {
     // רדיו או מציג HTML שכבר לא קיימים במכשיר (נמחקו בעבר או לא היו בקושחה) מוצגים באפור ולא לחיצים
     private fun checkExists() {
         Thread {
-            fun exists(dir: String): Boolean {
-                if (File(dir).exists()) return true
-                val (code, out) = runAsRoot("[ -e ${q(dir)} ] && echo YES || echo NO")
-                return code != 0 || !out.contains("NO") // אם הבדיקה דרך root נכשלה, לא מאפירים
-            }
+            // תיקיות המערכת קריאות גם בלי root — אין כאן בדיקת root נוספת
+            fun exists(dir: String) = File(dir).exists()
             val radio = exists(radioDir)
             val html = exists(htmlDir)
             runOnUiThread {
@@ -113,14 +110,12 @@ class CustomizationActivity : BaseActivity() {
                     show(statusView, "נמחק בהצלחה.", acc); askReboot()
                 }
                 else {
-                    setTextIsSelectable(statusView)
-                    show(statusView, "נכשל (קוד $code):\n${out.ifBlank { "(ריק)" }}", warnC)
+                    show(statusView, "הפעולה נכשלה", warnC)
                 }
             }
         }.start()
     }
 
-    private fun setTextIsSelectable(t: TextView) { t.setTextIsSelectable(true); t.typeface = android.graphics.Typeface.MONOSPACE; t.textSize = 11f }
 
     // מעתיק את קובץ המצלמה המקורית מתוך נכסי עזרים עצמה (קובץ קטן), לנתיב המערכת, עם הרשאות 644
     private fun revertCamera() {
@@ -135,7 +130,7 @@ class CustomizationActivity : BaseActivity() {
                 val (code, out) = runAsRoot(cmd)
                 runOnUiThread {
                     if (out.contains("OK")) { show(camStatus, "הוחלפה בהצלחה.", acc); askReboot() }
-                    else { setTextIsSelectable(camStatus); show(camStatus, "נכשל (קוד $code):\n${out.ifBlank { "(ריק)" }}", warnC) }
+                    else show(camStatus, "הפעולה נכשלה", warnC)
                 }
             } catch (e: Exception) {
                 runOnUiThread { show(camStatus, "קובץ המצלמה המקורית חסר באפליקציה (camera_stock.apk).", warnC) }

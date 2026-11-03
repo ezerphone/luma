@@ -74,7 +74,6 @@ class MainActivity : BaseActivity() {
         try { app.luma.torch.dictation.VoiceIme.ensureDefault(this) } catch (_: Exception) {}
         try { app.luma.torch.assistant.Assistant.ensureDefault(this) } catch (_: Exception) {}
         try { app.luma.torch.assistant.Hotword.sync(this) } catch (_: Exception) {}
-        try { app.luma.torch.assistant.TtsRestore.ensure(this) } catch (_: Exception) {} // קול עברי ל-Google TTS, אם חסר
         val btCard = big(R.drawable.ic_bluetooth, "כתובת בלוטוס", "שינוי כתובת MAC (דורש root)", BtAddressActivity::class.java)
         val sysCard = big(R.drawable.ic_statusbar, "הגדרות מערכת", "כפתור סיבוב, עיצוב הסטטוס בר וקיצורים", SystemSettingsActivity::class.java)
         val hideCard = big(R.drawable.ic_hide, "הסתרת אייקונים", "הסתרת אייקון של אפליקציה ממסך הבית", HideIconActivity::class.java)
@@ -100,8 +99,7 @@ class MainActivity : BaseActivity() {
     // מאפיר ומנטרל כרטיסים שדורשים root, כשאין במכשיר הרשאת root
     private fun checkRoot(rootCards: List<View>) {
         Thread {
-            val (code, out) = runAsRoot("id")
-            val ok = code == 0 && out.contains("uid=0")
+            val ok = RootShell.hasRoot() // התוצאה של הבדיקה היחידה בכניסה
             runOnUiThread {
                 rootCards.forEach { it.alpha = if (ok) 1f else 0.4f; it.isEnabled = ok }
             }
