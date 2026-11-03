@@ -37,7 +37,12 @@ class SpeakActivity : BaseActivity() {
         paint()
     }
 
-    override fun onResume() { super.onResume(); paint() }
+    // בכל חזרה למסך: אם עדיין אין קול עברי — בודקים שוב (אולי נוסף בינתיים)
+    override fun onResume() {
+        super.onResume()
+        if (!busy && Voice.ready && !Voice.hebrew) Voice.recheck(this) { paint() }
+        paint()
+    }
 
     private fun paint() {
         if (busy) return
@@ -59,10 +64,25 @@ class SpeakActivity : BaseActivity() {
         if (busy) return
         busy = true; install.isEnabled = false; install.text = "מתקין…"
         TtsRestore.install(this) { r ->
-            busy = false; install.isEnabled = true; install.text = "התקנת קול עברי"
-            paint()   // אחרי התקנה מוצלחת עזר כבר בדק מחדש: אם יש קול — הכפתור נעלם והמתג נדלק
-            if (r == TtsRestore.Result.NO_ROOT) { msg.text = "אין הרשאת root להתקנת הקול"; msg.visibility = View.VISIBLE }
-            else if (r == TtsRestore.Result.FAIL || !Voice.hebrew) { msg.text = "התקנת הקול נכשלה"; msg.visibility = View.VISIBLE }
+            if (r == TtsRestore.Result.OK && !Voice.hebrew) { install.text = "מתקין… רגע"; poll(10) }   // הקול נטען במנוע אחרי שנייה-שתיים
+            else done(r)
         }
+    }
+
+    // אחרי ההעתקה: בודקים שוב כל שנייה וחצי עד שהקול מופיע (עד 15 שניות), בלי לצאת מהמסך
+    private fun poll(left: Int) {
+        install.postDelayed({
+            if (isFinishing) return@postDelayed
+            Voice.recheck(this) {
+                if (Voice.hebrew || left <= 1) done(TtsRestore.Result.OK) else poll(left - 1)
+            }
+        }, 1500)
+    }
+
+    private fun done(r: TtsRestore.Result) {
+        busy = false; install.isEnabled = true; install.text = "התקנת קול עברי"
+        paint()   // יש קול — הכפתור נעלם, המתג נדלק ו"השמעת דוגמה" מופיע
+        if (r == TtsRestore.Result.NO_ROOT) { msg.text = "אין הרשאת root להתקנת הקול"; msg.visibility = View.VISIBLE }
+        else if (r == TtsRestore.Result.FAIL || !Voice.hebrew) { msg.text = "התקנת הקול נכשלה"; msg.visibility = View.VISIBLE }
     }
 }

@@ -21,7 +21,7 @@ import app.luma.torch.dictation.VoiceIme
 // רכיבי המסכים של הגדרות עזר, בעיצוב של שאר עזרים
 
 // כרטיסייה: אייקון, כותרת, שורת מצב, וחץ. מחזירה את הכרטיסייה ואת שורת המצב (לעדכון)
-fun BaseActivity.navCard(res: Int, title: String, click: () -> Unit): Pair<View, TextView> {
+fun BaseActivity.navCard(res: Int, title: String, chevron: Boolean = true, click: () -> Unit): Pair<View, TextView> {
     val sub = TextView(this).apply { textSize = 12f; setTextColor(dim); setPadding(0, dp(2), 0, 0) }
     val v = LinearLayout(this).apply {
         gravity = Gravity.CENTER_VERTICAL; background = shape(card, 20, line); setPadding(dp(14), dp(12), dp(14), dp(12))
@@ -34,7 +34,7 @@ fun BaseActivity.navCard(res: Int, title: String, click: () -> Unit): Pair<View,
             addView(TextView(this@navCard).apply { text = title; textSize = 16f; setTextColor(fg); typeface = Typeface.DEFAULT_BOLD })
             addView(sub)
         }, LinearLayout.LayoutParams(0, -2, 1f))
-        addView(ImageView(this@navCard).apply { setImageDrawable(icon(R.drawable.ic_chevron, dim)) }, LinearLayout.LayoutParams(dp(18), dp(18)))
+        if (chevron) addView(ImageView(this@navCard).apply { setImageDrawable(icon(R.drawable.ic_chevron, dim)) }, LinearLayout.LayoutParams(dp(18), dp(18)))
         setOnClickListener { click() }
     }
     return v to sub

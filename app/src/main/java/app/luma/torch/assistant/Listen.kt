@@ -5,7 +5,7 @@ import android.os.Handler
 import android.os.Looper
 import app.luma.torch.dictation.SpeechEngine
 
-// האזנה אחת לבקשה: מתחילה, מעבירה טקסט חלקי, ומסיימת לבד אחרי שקט (1.3 שנ') או כשלא אמרו כלום (7 שנ').
+// האזנה אחת לבקשה: מתחילה, מעבירה טקסט חלקי, ומסיימת לבד אחרי שקט (1.75 שנ') או כשלא אמרו כלום (12 שנ').
 // בזמן ההאזנה ההאזנה ל"היי עזר" מושהית.
 class Listen(c: Context, private val cb: Callback) : SpeechEngine.Observer {
     interface Callback {
@@ -13,6 +13,7 @@ class Listen(c: Context, private val cb: Callback) : SpeechEngine.Observer {
         fun onPartial(text: String)
         fun onFinal(text: String)
         fun onNothing()
+        fun onLoading() {}   // מודל הזיהוי עוד נטען
     }
 
     private val engine = SpeechEngine.get(c)
@@ -31,6 +32,7 @@ class Listen(c: Context, private val cb: Callback) : SpeechEngine.Observer {
         if (!holding) { holding = true; Hotword.hold() }
         engine.warm(); engine.observe(this)
         want = true; last = ""
+        if (engine.state() != "ready") cb.onLoading()
         tryStart()
     }
 
@@ -47,7 +49,7 @@ class Listen(c: Context, private val cb: Callback) : SpeechEngine.Observer {
             override fun onText(text: String) {
                 if (text == last) return
                 last = text; cb.onPartial(text)
-                h.removeCallbacks(silence); if (text.isNotBlank()) h.postDelayed(silence, 1300)
+                h.removeCallbacks(silence); if (text.isNotBlank()) h.postDelayed(silence, 1750)
             }
             override fun onFinished() {
                 h.removeCallbacks(silence); h.removeCallbacks(nothing)
@@ -56,7 +58,7 @@ class Listen(c: Context, private val cb: Callback) : SpeechEngine.Observer {
             }
             override fun onError(message: String) { active = false; engine.remove(this@Listen); releaseOnce(); cb.onNothing() }
         })
-        if (ok) { active = true; cb.onListening(); h.postDelayed(nothing, 7000) }
+        if (ok) { active = true; cb.onListening(); h.postDelayed(nothing, 12000) }
     }
 
     override fun onState(state: String) { tryStart() }

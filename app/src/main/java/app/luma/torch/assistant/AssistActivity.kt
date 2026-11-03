@@ -40,6 +40,13 @@ class AssistActivity : BaseActivity(), Listen.Callback {
     private lateinit var micIcon: ImageView
     private lateinit var micWave: Bars
     private lateinit var sendBtn: ImageView
+    private lateinit var spk: ImageView
+    private var loading = false   // מודל זיהוי הדיבור עוד נטען — מציגים "רגע…"
+    private lateinit var tone: Bubble.Tone
+    private var dk = true          // בועה כהה / בהירה (לפי ההגדרות)
+    private val txtBig get() = if (dk) Color.WHITE else 0xFF111111.toInt()
+    private val txtSmall get() = if (dk) 0xFFAAB4C3.toInt() else 0xFF5B6472.toInt()
+    private val iconC get() = if (dk) Color.WHITE else tone.main
     private var listen: Listen? = null
     private var answered = false   // יש תשובה על המסך (נשארת עד שאומרים משהו חדש)
     private val close = Runnable { finish() }
@@ -64,11 +71,12 @@ class AssistActivity : BaseActivity(), Listen.Callback {
         // גם כשהמסך כבוי או נעול ("היי עזר" מהכיס): מדליקים את המסך ומופיעים מעל מסך הנעילה
         setShowWhenLocked(true); setTurnScreenOn(true)
         Voice.init(this)
+        tone = Bubble.tone(this); dk = Bubble.dark(this)
 
         orb = Orb(this)
-        small = TextView(this).apply { textSize = 13f; setTextColor(0xFFAAB4C3.toInt()); gravity = Gravity.CENTER; maxLines = 2 }
+        small = TextView(this).apply { textSize = 13f; setTextColor(txtSmall); gravity = Gravity.CENTER; maxLines = 2 }
         big = TextView(this).apply {
-            textSize = 22f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER
+            textSize = 22f; setTextColor(txtBig); typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER
             setLineSpacing(0f, 1.15f); maxLines = 6
         }
         val top = LinearLayout(this).apply {
@@ -77,9 +85,26 @@ class AssistActivity : BaseActivity(), Listen.Callback {
             addView(small, LinearLayout.LayoutParams(-1, -2))
             addView(big, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
         }
+        // כפתור קטן בפינה: הפעלה / כיבוי של הקראת התשובות (מופיע רק כשיש קול עברי)
+        spk = ImageView(this).apply {
+            setPadding(dp(8), dp(8), dp(8), dp(8)); visibility = View.GONE
+            background = circle(if (dk) 0x1FFFFFFF else 0x0F000000)
+            setOnClickListener {
+                val p = Assistant.prefs(this@AssistActivity)
+                val on = !p.getBoolean("speak", true)
+                p.edit().putBoolean("speak", on).apply()
+                if (!on) Voice.stop()
+                paintSpk()
+            }
+        }
+        val head = FrameLayout(this).apply {
+            addView(top, FrameLayout.LayoutParams(-1, -2))
+            addView(spk, FrameLayout.LayoutParams(dp(34), dp(34), Gravity.TOP or Gravity.LEFT).apply { setMargins(dp(12), dp(12), 0, 0) })
+        }
+        Voice.whenReady(this) { if (!isFinishing) paintSpk() }
 
         input = EditText(this).apply {
-            hint = "יש לך שאלה..."; setHintTextColor(0xAAFFFFFF.toInt()); setTextColor(Color.WHITE); textSize = 15f
+            hint = "יש לך שאלה..."; setHintTextColor(if (dk) 0xAAFFFFFF.toInt() else 0x88000000.toInt()); setTextColor(txtBig); textSize = 15f
             background = null; setPadding(dp(16), 0, dp(8), 0)
             isSingleLine = true; imeOptions = EditorInfo.IME_ACTION_SEND
             setOnEditorActionListener { _, _, _ -> sendTyped(); true }
@@ -90,8 +115,8 @@ class AssistActivity : BaseActivity(), Listen.Callback {
                 override fun afterTextChanged(s: Editable?) { paint() }
             })
         }
-        micIcon = ImageView(this).apply { setImageDrawable(icon(R.drawable.ic_mic, Color.WHITE)); setPadding(dp(10), dp(10), dp(10), dp(10)) }
-        micWave = Bars(this)
+        micIcon = ImageView(this).apply { setImageDrawable(icon(R.drawable.ic_mic, iconC)); setPadding(dp(10), dp(10), dp(10), dp(10)) }
+        micWave = Bars(this).apply { color = iconC }
         micBtn = FrameLayout(this).apply {
             addView(micIcon, FrameLayout.LayoutParams(-1, -1))
             addView(micWave, FrameLayout.LayoutParams(dp(22), dp(18), Gravity.CENTER))
@@ -100,8 +125,9 @@ class AssistActivity : BaseActivity(), Listen.Callback {
         sendBtn = ImageView(this).apply { setPadding(dp(11), dp(11), dp(11), dp(11)); setOnClickListener { sendTyped() } }
         val glass = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL; setPadding(0, 0, dp(6), 0)
-            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0x33FFFFFF, 0x14FFFFFF)).apply {
-                cornerRadius = dp(26).toFloat(); setStroke(dp(1), 0x55FFFFFF)
+            background = (if (dk) GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0x33FFFFFF, 0x14FFFFFF))
+                else GradientDrawable().apply { setColor(0xCCFFFFFF.toInt()) }).apply {
+                cornerRadius = dp(26).toFloat(); setStroke(dp(1), if (dk) 0x55FFFFFF else 0x1A000000)
             }
             addView(input, LinearLayout.LayoutParams(0, -1, 1f))
             addView(micBtn, LinearLayout.LayoutParams(dp(40), dp(40)).apply { marginEnd = dp(6) })
@@ -110,11 +136,12 @@ class AssistActivity : BaseActivity(), Listen.Callback {
 
         panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; isClickable = true; elevation = dp(12).toFloat(); clipToOutline = true
-            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(0xFF020611.toInt(), 0xFF030B22.toInt(), 0xFF0A2A66.toInt(), 0xFF2A6FD6.toInt(), 0xFF6FAEF8.toInt())).apply {
-                cornerRadius = dp(30).toFloat(); setStroke(dp(1), 0x22FFFFFF)
+            val colors = if (dk) intArrayOf(0xFF020611.toInt(), Bubble.mix(0xFF020611.toInt(), tone.deep, 0.35f), tone.deep, tone.main, tone.light)
+                else intArrayOf(Color.WHITE, Color.WHITE, Bubble.mix(Color.WHITE, tone.light, 0.15f), Bubble.mix(Color.WHITE, tone.light, 0.35f), Bubble.mix(Color.WHITE, tone.light, 0.6f))
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, colors).apply {
+                cornerRadius = dp(30).toFloat(); setStroke(dp(1), if (dk) 0x22FFFFFF else 0x10000000)
             }
-            addView(top, LinearLayout.LayoutParams(-1, -2))
+            addView(head, LinearLayout.LayoutParams(-1, -2))
             addView(glass, LinearLayout.LayoutParams(-1, dp(52)).apply { setMargins(dp(12), 0, dp(12), dp(14)) })
         }
         // גרירה של החלק העליון כלפי מעלה → הצ'אט המלא (נגיעה רגילה לא)
@@ -176,15 +203,25 @@ class AssistActivity : BaseActivity(), Listen.Callback {
     // כפתורים: מיקרופון (גל קול כשמקשיב) ושליחה (נדלקת כשיש טקסט)
     private fun paint() {
         val on = listen?.isListening == true
-        micBtn.background = if (on) circle(0x40FFFFFF) else null
+        micBtn.background = if (on) circle(if (dk) 0x40FFFFFF else (tone.main and 0x00FFFFFF) or 0x26000000) else null
         micIcon.visibility = if (on) View.GONE else View.VISIBLE
         micWave.visibility = if (on) View.VISIBLE else View.GONE
         micWave.active = on; orb.listening = on
         val typed = input.text.isNotBlank()
-        sendBtn.setImageDrawable(icon(R.drawable.ic_send, if (typed) 0xFF0A2A66.toInt() else 0x88FFFFFF.toInt()))
-        sendBtn.background = circle(if (typed) Color.WHITE else 0x1FFFFFFF)
+        sendBtn.setImageDrawable(icon(R.drawable.ic_send, when {
+            dk && typed -> tone.deep; dk -> 0x88FFFFFF.toInt(); typed -> Color.WHITE; else -> 0x66000000 }))
+        sendBtn.background = circle(when { dk && typed -> Color.WHITE; dk -> 0x1FFFFFFF; typed -> tone.main; else -> 0x0D000000 })
         sendBtn.isEnabled = typed
-        input.hint = if (on) "מקשיב…" else "יש לך שאלה..."
+        input.hint = when { on -> "מקשיב…"; loading -> "רגע…"; else -> "יש לך שאלה..." }
+        orb.alpha = if (loading) 0.6f else 1f
+    }
+
+    private fun paintSpk() {
+        if (!Voice.hebrew) { spk.visibility = View.GONE; return }
+        val on = Assistant.prefs(this).getBoolean("speak", true)
+        spk.setImageDrawable(icon(if (on) R.drawable.ic_speaker else R.drawable.ic_speaker_off, if (dk) Color.WHITE else 0xFF333333.toInt()))
+        spk.contentDescription = if (on) "כיבוי הקראה" else "הפעלת הקראה"
+        spk.visibility = View.VISIBLE
     }
 
     private fun canListen() = ModelLocator.isInstalled() && checkSelfPermission(Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -195,16 +232,18 @@ class AssistActivity : BaseActivity(), Listen.Callback {
         (listen ?: Listen(this, this).also { listen = it }).start()
     }
 
-    override fun onListening() { paint(); if (!answered) { small.text = "${Assistant.NAME} מקשיב"; } }
+    // המודל נטען: "רגע…" (החלונית לא נסגרת בינתיים)
+    override fun onLoading() { loading = true; h.removeCallbacks(close); if (!answered) small.text = "רגע…"; paint() }
+    override fun onListening() { loading = false; paint(); if (!answered) { small.text = "${Assistant.NAME} מקשיב"; } }
     override fun onPartial(text: String) {
         answered = false; orb.big = true
         small.text = "${Assistant.NAME} מקשיב"; big.text = text; big.textSize = 22f
     }
     override fun onFinal(text: String) { paint(); process(text, voice = true) }
     override fun onNothing() {
-        paint()
-        // לא נאמר כלום: אם יש תשובה — משאירים אותה לקריאה עוד קצת, ואז החלונית נסגרת
-        h.postDelayed(close, if (answered) 6000 else 1500)
+        // לא נאמר כלום: רק ההקלטה נעצרת. החלונית נשארת פתוחה (נסגרת בנגיעה מחוץ לה)
+        loading = false; paint()
+        if (!answered) greet()
     }
 
     private fun sendTyped() {
@@ -269,17 +308,17 @@ class AssistActivity : BaseActivity(), Listen.Callback {
             val cx = width / 2f; val cy = height / 2f
             val pulse = if (listening) 1f + 0.06f * sin(t * 2 * Math.PI.toFloat() * 8) else 1f
             val r = min(width, height) / 2f * 0.62f * scale * pulse
-            glow.color = 0xFF2F7BFF.toInt(); glow.alpha = if (listening) 150 else 95
+            glow.color = tone.main; glow.alpha = if (listening) 150 else 95
             glow.maskFilter = BlurMaskFilter(r * (if (listening) 0.75f else 0.5f), BlurMaskFilter.Blur.NORMAL)
             cv.drawCircle(cx, cy, r, glow)
             body.shader = RadialGradient(cx + r * 0.2f, cy + r * 0.25f, r * 1.1f,
-                intArrayOf(0xFF2A7BFF.toInt(), 0xFF0A1F5C.toInt(), 0xFF020611.toInt()), floatArrayOf(0f, 0.6f, 1f), Shader.TileMode.CLAMP)
+                intArrayOf(Bubble.mix(tone.main, Color.WHITE, 0.1f), tone.deep, if (dk) 0xFF020611.toInt() else Bubble.mix(tone.deep, tone.main, 0.3f)), floatArrayOf(0f, 0.6f, 1f), Shader.TileMode.CLAMP)
             cv.drawCircle(cx, cy, r, body)
             shine.shader = RadialGradient(cx - r * 0.35f, cy - r * 0.4f, r * 0.5f, 0x66FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP)
             cv.drawCircle(cx, cy, r, shine)
             cv.save(); cv.rotate(t * 360f, cx, cy)
             ring.strokeWidth = r * 0.07f
-            ring.shader = SweepGradient(cx, cy, intArrayOf(0x007CC4FF, 0xFF7CC4FF.toInt(), 0xFFB39DFF.toInt(), 0x007CC4FF), null)
+            ring.shader = SweepGradient(cx, cy, intArrayOf(tone.light and 0x00FFFFFF, tone.light, Bubble.mix(tone.light, Color.WHITE, 0.4f), tone.light and 0x00FFFFFF), null)
             cv.drawArc(RectF(cx - r * 1.04f, cy - r * 1.04f, cx + r * 1.04f, cy + r * 1.04f), 0f, 300f, false, ring)
             cv.restore()
         }
@@ -291,6 +330,7 @@ class AssistActivity : BaseActivity(), Listen.Callback {
         private val n = 5
         private val cur = FloatArray(n) { 0.3f }
         private val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
+        var color: Int get() = p.color; set(v) { p.color = v }
         private val rnd = java.util.Random()
         private var frame = 0
         private val anim = ValueAnimator.ofFloat(0f, 1f).apply {
