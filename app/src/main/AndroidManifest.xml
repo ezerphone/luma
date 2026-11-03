@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- עזר: סגירת אפליקציה, ניקוי אפליקציות אחרונות, חלון הסרת אפליקציה -->
+    <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES"/>
+    <uses-permission android:name="android.permission.REMOVE_TASKS"/>
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"/>
@@ -54,6 +58,8 @@
         <activity android:name=".HideIconActivity" android:exported="false"/>
         <activity android:name=".SettingsActivity" android:exported="false"/>
         <activity android:name=".assistant.AssistantActivity" android:exported="false"/>
+        <activity android:name=".assistant.HotwordActivity" android:exported="false"/>
+        <activity android:name=".assistant.SpeakActivity" android:exported="false"/>
         <activity android:name=".assistant.ChatActivity" android:exported="false" android:windowSoftInputMode="adjustResize"/>
         <activity android:name=".assistant.ChatHistoryActivity" android:exported="false"/>
         <!-- "היי עזר": האזנה ברקע (רק כשהמשתמש הפעיל את המתג) -->
@@ -65,7 +71,7 @@
         </service>
         <!-- חלונית העוזר: עוזר המערכת (ASSIST) ופקודה קולית -->
         <activity android:name=".assistant.AssistActivity" android:exported="true" android:excludeFromRecents="true" android:taskAffinity=""
-            android:launchMode="singleTask" android:theme="@android:style/Theme.Translucent.NoTitleBar" android:windowSoftInputMode="adjustResize">
+            android:launchMode="singleTask" android:theme="@style/AssistPanel" android:windowSoftInputMode="adjustResize">
             <intent-filter><action android:name="android.intent.action.ASSIST"/><category android:name="android.intent.category.DEFAULT"/></intent-filter>
             <intent-filter><action android:name="android.intent.action.VOICE_COMMAND"/><category android:name="android.intent.category.DEFAULT"/></intent-filter>
         </activity>

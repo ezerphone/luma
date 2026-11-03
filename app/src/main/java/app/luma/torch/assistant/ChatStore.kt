@@ -38,4 +38,17 @@ object ChatStore {
     }
 
     fun delete(c: Context, id: String) { File(dir(c), "$id.json").delete() }
+
+    // שינוי שם, בלי לשנות את מקום השיחה ברשימה
+    fun rename(c: Context, id: String, title: String) {
+        val ch = load(c, id) ?: return
+        val a = JSONArray(); ch.msgs.forEach { a.put(JSONObject().put("me", it.me).put("x", it.text).put("t", it.t)) }
+        File(dir(c), "$id.json").writeText(JSONObject().put("title", title).put("updated", ch.updated).put("m", a).toString())
+    }
+
+    // השיחה כטקסט (לייצוא)
+    fun asText(ch: Chat, name: String): String {
+        val f = java.text.SimpleDateFormat("d.M.yyyy HH:mm", java.util.Locale("he"))
+        return "${ch.title}\n" + ch.msgs.joinToString("\n") { (if (it.me) "אני" else name) + " (" + f.format(java.util.Date(it.t)) + "): " + it.text }
+    }
 }

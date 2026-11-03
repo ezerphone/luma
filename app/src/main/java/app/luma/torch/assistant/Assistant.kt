@@ -73,8 +73,6 @@ object Assistant {
     // ---------- תשובות (כאן כל הנוסחים הקבועים) ----------
     object Say {
         const val NOT_UNDERSTOOD = "לא הבנתי. אפשר לנסח אחרת?"
-        const val NOT_YET = "את זה עוד לא למדתי לעשות"
-        const val NOT_SUPPORTED = "את זה עזר לא עושה"
         const val ERROR = "משהו השתבש"
         const val CANCELLED = "בסדר, ביטלתי"
         const val GREETING = "שלום! במה אפשר לעזור?"
@@ -84,7 +82,8 @@ object Assistant {
         const val NEED_MUSIC = "צריך לאשר לעזרים גישה לקבצי המוזיקה (בהגדרות עזר)"
         const val HELP = "אפשר לבקש: לפתוח אפליקציה, פנס, תזכורת, טיימר, שעון מעורר, סטופר, מה השעה, שעה בעולם, תאריך עברי, זמני היום, " +
             "פרשת השבוע, מתי חג, ראש חודש, ספירת העומר, מולד, סוללה, שקט או רטט, ווליום ובהירות, לנגן שיר, מה מתנגן, טיימר שינה, " +
-            "פתקים, משימות, רשימת קניות, הוצאות, שתיית מים, מע״מ, ניווט, צילום מסך ומסך הבית."
+            "פתקים, משימות, רשימת קניות, הוצאות, שתיית מים, מע״מ, מחשבון, המרת יחידות, לוח שנה, הקראת התראות, ניווט, " +
+            "פעולות במסך (לחיצה, הקלדה, גלילה, הקראת המסך), סגירת אפליקציה, חיפוש במכשיר, צילום מסך ומסך הבית."
     }
 
     // then: פעולה שמתבצעת מיד אחרי שהחלונית נסגרת (פתיחת אפליקציה, מסך הבית…)
@@ -93,9 +92,13 @@ object Assistant {
     private val INTERNAL = mapOf("reminder_add" to "reminder", "timer_set" to "timer", "alarm_set" to "alarm", "zmanim_all" to "zmanim",
         "battery_query" to "battery", "dnd_on" to "ringer_silent", "vibrate_mode" to "ringer_vibrate", "dnd_off" to "ringer_normal",
         "music_pause" to "media_pause", "music_resume" to "media_play", "music_next" to "media_next", "music_prev" to "media_prev")
-    // הוסרו בכוונה: שיחות, הודעות, וייפיי ואינטרנט
-    private val REMOVED = setOf("call_contact", "call_back", "recent_calls", "contact_number", "message_send", "notif_read", "driving_on", "driving_off",
-        "wifi_on", "wifi_off", "transit_route", "bus_line", "app_store")
+    // עזר לא מכיר את אלה בכלל — עונה "לא הבנתי", כאילו ביקשו משהו שלא קיים
+    private val GONE = setOf("call_contact", "call_back", "recent_calls", "contact_number", "message_send", "driving_on", "driving_off",
+        "wifi_on", "wifi_off", "transit_route", "bus_line", "name_ask_user", "name_set_user", "name_set_assistant", "knowledge_query",
+        "voice_record", "bracha_query", "saying", "daf_yomi", "tehillim", "fun_fact", "suggest_food", "breathing", "shabbat_on", "shabbat_off",
+        "parking_save", "parking_find")
+    private val REPEAT = listOf("תחזור על זה", "תחזור שוב", "תגיד שוב", "מה אמרת", "תחזור על התשובה").map { IntentEngine.n(it) }
+    @Volatile private var last = ""   // התשובה האחרונה ("תחזור על זה")
     private val OPEN_VERBS = listOf("תפתח", "תפתחי", "פתח", "פתחי", "לפתוח", "תיכנס", "תכנס", "כנס", "היכנס", "להיכנס", "תפעיל", "הפעל", "תריץ", "תקפיץ")
         .map { IntentEngine.n(it) }.toSet()
 
@@ -112,16 +115,24 @@ object Assistant {
     }
 
     fun handle(c: Context, said: String): Reply {
+        val t = IntentEngine.n(said)
+        if (REPEAT.any { t.contains(it) }) return Reply(last.ifBlank { "אין עדיין מה לחזור עליו" })
+        val r = handleInner(c, said)
+        if (r.text.isNotBlank()) last = r.text
+        return r
+    }
+
+    private fun handleInner(c: Context, said: String): Reply {
         hotwordOff(c, said)?.let { return it }
+        Extras.calc(said)?.let { return it }   // "כמה זה 15 כפול 4"
         val r = engine(c).classify(said)
-        if (r.label in REMOVED && r.prob >= 0.35f) return Reply(Say.NOT_SUPPORTED)
         val first = IntentEngine.n(said).split(' ').firstOrNull { it !in IntentEngine.FILLER }
         if (r.label == "open_app" || (first in OPEN_VERBS && r.prob < 0.35f)) {
             val u = slots.parse("open_app", r.prob, said)
             findApp(c, u.text)?.let { (label, i) -> return Reply("פותח את $label", then = { c.startActivity(i) }) }
             if (r.label == "open_app" && r.prob >= 0.35f) return Reply("לא מצאתי אפליקציה בשם ${u.text ?: ""}")
         }
-        if (r.label == "other" || r.prob < 0.35f) return Reply(Say.NOT_UNDERSTOOD)
+        if (r.label == "other" || r.label in GONE || r.prob < 0.35f) return Reply(Say.NOT_UNDERSTOOD)
         val u = slots.parse(INTERNAL[r.label] ?: r.label, r.prob, said)
         Torch.init(c)
         val today = LocalDate.now()
@@ -217,7 +228,36 @@ object Assistant {
             "compliment" -> Reply("תודה, אתה נחמד!")
             "feeling", "cheer_up" -> Reply("אני כאן. מקווה שיהיה לך יום טוב יותר")
             "complaint" -> Reply("מצטער, אני עוד לומד. אפשר לנסח אחרת?")
-            else -> Reply(Say.NOT_YET)
+            // נוספו
+            "notif_read" -> Extras.notifications(c)
+            "app_store" -> Extras.store(c)
+            "calc" -> Extras.calc(said) ?: Reply("מה לחשב? למשל: כמה זה 15 כפול 4")
+            "convert_units" -> Extras.convert(said)
+            "calendar_add" -> Extras.calendar(c, said)
+            "clipboard_read" -> Extras.clipboard(c)
+            "read_screen" -> Extras.readScreen(c)
+            "screen_click" -> Extras.click(c, said)
+            "screen_type" -> Extras.type(c, said)
+            "scroll_down" -> Extras.scroll(true)
+            "scroll_up" -> Extras.scroll(false)
+            "swipe_left" -> Extras.swipe(true)
+            "swipe_right" -> Extras.swipe(false)
+            "long_press" -> Extras.longPress(c, said)
+            "text_copy" -> Extras.text(c, "copy")
+            "text_paste" -> Extras.text(c, "paste")
+            "text_select_all" -> Extras.text(c, "select")
+            "text_clear" -> Extras.text(c, "clear")
+            "app_close" -> Extras.closeApp(c)
+            "app_previous" -> Extras.previousApp()
+            "clear_recents" -> Extras.clearRecents(c)
+            "app_info" -> Extras.appInfo(c, said)
+            "app_uninstall" -> Extras.uninstall(c, said)
+            "local_search" -> Extras.searchDevice(c, said)
+            "search_in_app" -> Extras.searchInApp(c, said)
+            "repeat" -> Reply(last.ifBlank { "אין עדיין מה לחזור עליו" })
+            "random" -> Extras.random(said)
+            "open_photo" -> Extras.photos(c)
+            else -> Reply(Say.NOT_UNDERSTOOD)
         }
     }
 
@@ -271,7 +311,7 @@ object Assistant {
         val key = HebCal.HOLIDAYS.firstOrNull { q.contains(IntentEngine.n(it.first)) }?.second
         val target: LocalDate; val name: String
         when {
-            key != null -> { target = HebCal.nextHoliday(key, today) ?: return Reply(Say.NOT_YET); name = HebCal.HOLIDAY_NAMES[key]!! }
+            key != null -> { target = HebCal.nextHoliday(key, today) ?: return Reply("לא מצאתי את התאריך"); name = HebCal.HOLIDAY_NAMES[key]!! }
             q.contains(IntentEngine.n("שבת")) -> { target = today.with(TemporalAdjusters.nextOrSame(DayOfWeek.SATURDAY)); name = "שבת" }
             q.contains(IntentEngine.n("ראש חודש")) -> return roshChodesh(today)
             else -> return Reply("לא זיהיתי את התאריך")

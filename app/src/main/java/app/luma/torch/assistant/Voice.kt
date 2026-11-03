@@ -6,16 +6,18 @@ import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.os.Handler
 import android.os.Looper
-import java.util.Locale
 
-// הקראת התשובות: מנוע ההקראה של גוגל ישירות (וגם מוגדר כברירת המחדל של המערכת אם לא הוגדר כלום), בקול עברי.
+// הקראת התשובות: מנוע ההקראה של גוגל ישירות (וגם מוגדר כברירת המחדל של המערכת אם לא הוגדר כלום), בקול עברי מקומי בלבד —
+// קול שצריך אינטרנט לא נבחר (בלי אינטרנט הוא פשוט שותק).
 object Voice {
     private const val GOOGLE = "com.google.android.tts"
     private var tts: TextToSpeech? = null
-    @Volatile var ready = false; private set
+    @Volatile var ready = false; private set    // המנוע סיים להיטען (הצליח או לא)
     @Volatile var hebrew = false; private set
     private val main = Handler(Looper.getMainLooper())
     private var onDone: (() -> Unit)? = null
+    private var pending: Pair<String, (() -> Unit)?>? = null   // הקראה שהתבקשה לפני שהמנוע סיים להיטען
+    private val waiters = mutableListOf<() -> Unit>()
 
     fun enabled(c: Context) = Assistant.prefs(c).getBoolean("speak", true)
 
@@ -27,8 +29,13 @@ object Voice {
                 Settings.Secure.putString(app.contentResolver, "tts_default_synth", GOOGLE)
         } catch (_: Exception) {}
         val listener = TextToSpeech.OnInitListener { st ->
-            ready = st == TextToSpeech.SUCCESS
-            if (ready) pickHebrew()
+            main.post {
+                hebrew = st == TextToSpeech.SUCCESS && pickHebrew()
+                ready = true
+                val p = pending; pending = null
+                p?.let { (text, done) -> speak(app, text, done) }
+                val w = waiters.toList(); waiters.clear(); w.forEach { it() }
+            }
         }
         tts = if (installed(app)) TextToSpeech(app, listener, GOOGLE) else TextToSpeech(app, listener)
         tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
@@ -38,36 +45,41 @@ object Voice {
         })
     }
 
-    var status = ""; private set   // שורת אבחון למסך ההגדרות
-
-    // מחפש קול עברי: קודם ברשימת הקולות (מותקן, לא דורש רשת), ואם אין — לפי שפה (he / iw)
-    private fun pickHebrew() {
-        val t = tts ?: return
-        try {
-            val v = t.voices?.filter { (it.locale.language == "he" || it.locale.language == "iw") }
-                ?.sortedBy { (if (it.isNetworkConnectionRequired) 2 else 0) + (if ("notInstalled" in it.features) 4 else 0) }
-                ?.firstOrNull { "notInstalled" !in it.features }
-            if (v != null && t.setVoice(v) == TextToSpeech.SUCCESS) { hebrew = true; status = "קול: ${v.name}"; return }
-        } catch (_: Exception) {}
-        for (l in listOf(Locale("he", "IL"), Locale("iw", "IL"), Locale("he"), Locale("iw"))) {
-            val r = try { t.isLanguageAvailable(l) } catch (_: Exception) { -2 }
-            if (r >= TextToSpeech.LANG_AVAILABLE) { t.language = l; hebrew = true; status = "שפה: $l"; return }
-        }
-        hebrew = false
-        status = "מנוע: ${t.defaultEngine ?: "?"} · קולות: ${try { t.voices?.size ?: 0 } catch (_: Exception) { 0 }}"
+    // נקרא כשהמנוע מוכן (מיד, אם כבר מוכן) — להצגת המצב במסך ההגדרות
+    fun whenReady(c: Context, cb: () -> Unit) {
+        init(c)
+        if (ready) main.post(cb) else waiters += cb
     }
 
-    // בדיקה מחדש (למשל אחרי שהותקן קול) — משחרר ומאתחל את המנוע
-    fun recheck(c: Context) { try { tts?.shutdown() } catch (_: Exception) {}; tts = null; ready = false; hebrew = false; init(c) }
+    // קול עברי מותקן במכשיר, שלא צריך אינטרנט
+    private fun pickHebrew(): Boolean {
+        val t = tts ?: return false
+        return try {
+            val v = t.voices?.firstOrNull {
+                (it.locale.language == "he" || it.locale.language == "iw") && !it.isNetworkConnectionRequired && "notInstalled" !in it.features
+            } ?: return false
+            t.setVoice(v) == TextToSpeech.SUCCESS
+        } catch (_: Exception) { false }
+    }
+
+    // בדיקה מחדש (למשל אחרי שהותקן קול) — משחרר ומאתחל את המנוע; cb כשהבדיקה הסתיימה
+    fun recheck(c: Context, cb: (() -> Unit)? = null) {
+        try { tts?.shutdown() } catch (_: Exception) {}
+        tts = null; ready = false; hebrew = false
+        cb?.let { waiters += it }
+        init(c)
+    }
 
     private fun installed(c: Context) = try { c.packageManager.getPackageInfo(GOOGLE, 0); true } catch (_: Exception) { false }
 
-    // מקריא; done נקרא בסוף ההקראה — או מיד אם אין הקראה
+    // מקריא; done נקרא בסוף ההקראה — או מיד אם אין הקראה. אם המנוע עוד נטען — ההקראה מחכה לו
     fun speak(c: Context, text: String, done: (() -> Unit)? = null) {
-        if (!enabled(c) || !hebrew || text.isBlank()) { done?.let { main.post(it) }; return }
+        if (!enabled(c) || text.isBlank()) { done?.let { main.post(it) }; return }
+        if (!ready) { init(c); pending = text to done; return }
+        if (!hebrew) { done?.let { main.post(it) }; return }
         onDone = done
         tts?.speak(text.replace("\n", ". "), TextToSpeech.QUEUE_FLUSH, null, "r")
     }
 
-    fun stop() { onDone = null; tts?.stop() }
+    fun stop() { onDone = null; pending = null; tts?.stop() }
 }

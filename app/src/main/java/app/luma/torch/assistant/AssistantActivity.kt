@@ -1,99 +1,72 @@
 package app.luma.torch.assistant
 
-import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.speech.tts.TextToSpeech
-import android.view.View
-import android.widget.*
+import android.widget.TextView
 import app.luma.torch.BaseActivity
+import app.luma.torch.R
 
-// הגדרות עזר: "היי עזר", הקראה, עיר לזמני היום, עוזר המערכת, והרשאות (רק כשחסרות)
+// הגדרות עזר: כרטיסיות — היי עזר, הקראת תשובות, זמני היום, הרשאות, עוזר המערכת
 class AssistantActivity : BaseActivity() {
-    private lateinit var voiceText: TextView
-    private lateinit var voiceBtn: TextView
-    private lateinit var testBtn: TextView
-    private lateinit var roleText: TextView
-    private lateinit var permSection: View
-    private lateinit var cityBtn: TextView
-
-    private val perms: Array<String> get() = listOfNotNull(
-        Manifest.permission.RECORD_AUDIO,
-        if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_AUDIO else Manifest.permission.READ_EXTERNAL_STORAGE,
-        if (Build.VERSION.SDK_INT >= 33) Manifest.permission.POST_NOTIFICATIONS else null,
-        if (Build.VERSION.SDK_INT >= 31) Manifest.permission.BLUETOOTH_CONNECT else null
-    ).toTypedArray()
-
-    private fun sw(label: String, key: String, def: Boolean, after: () -> Unit = {}) = Switch(this).apply {
-        text = label; setTextColor(fg); isChecked = Assistant.prefs(this@AssistantActivity).getBoolean(key, def); tint(this)
-        layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4); bottomMargin = dp(4) }
-        setOnCheckedChangeListener { _, c -> Assistant.prefs(this@AssistantActivity).edit().putBoolean(key, c).apply(); after() }
-    }
-
-    private fun info(t: String = "") = TextView(this).apply { text = t; textSize = 12f; setTextColor(dim); setLineSpacing(0f, 1.25f); setPadding(0, dp(4), 0, 0) }
+    private lateinit var hotSub: TextView
+    private lateinit var speakSub: TextView
+    private lateinit var citySub: TextView
+    private lateinit var permSub: TextView
+    private lateinit var roleSub: TextView
+    private val h = Handler(Looper.getMainLooper())
 
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
         Voice.init(this)
-        val hot = sw("הפעלת ״היי עזר״", "hotword", false) { Hotword.sync(this) }
-        val hotCharge = sw("רק בזמן טעינה", "hotword_charging", false) { Hotword.sync(this) }
-        val hotLocked = sw("להקשיב גם כשהמסך נעול", "hotword_locked", false) { Hotword.sync(this) }
-        val hotOff = sw("להקשיב גם כשהמסך כבוי", "hotword_off", false) { Hotword.sync(this) }
-        val hotNote = info("המיקרופון פתוח ברקע (נקודה ירוקה בפינה) וצורך סוללה. אחרי הפעלה מחדש של המכשיר — לפתוח את עזרים פעם אחת.")
-
-        val speak = sw("הקראת תשובות", "speak", true)
-        voiceText = info()
-        // מתקין את הקול העברי מהקושחה ל-Google TTS (דורש root)
-        voiceBtn = tv("התקנת קול עברי") {
-            voiceBtn.isEnabled = false; voiceBtn.text = "מתקין…"
-            TtsRestore.install(this) { r ->
-                voiceBtn.isEnabled = true; voiceBtn.text = "התקנת קול עברי"
-                when (r) {
-                    TtsRestore.Result.OK -> { voiceText.text = "מתקין… רגע"; Handler(Looper.getMainLooper()).postDelayed({ refresh() }, 2500) }
-                    TtsRestore.Result.NO_ROOT -> voiceText.text = "אין הרשאת root להתקנת הקול"
-                    TtsRestore.Result.FAIL -> voiceText.text = "התקנת הקול נכשלה"
-                }
-            }
+        val hot = navCard(R.drawable.ic_mic, "היי ${Assistant.NAME}") { startActivity(Intent(this, HotwordActivity::class.java)) }
+        val speak = navCard(R.drawable.ic_speaker, "הקראת תשובות") { startActivity(Intent(this, SpeakActivity::class.java)) }
+        val city = navCard(R.drawable.ic_sun, "זמני היום") { pickCity() }
+        val perm = navCard(R.drawable.ic_lock, "הרשאות") { fixPermissions() }
+        val role = navCard(R.drawable.ic_assist, "עוזר המערכת") {
+            if (!Assistant.isDefault(this)) Assistant.makeDefault(this) { runOnUiThread { refresh() } }
         }
-        style(voiceBtn, false)
-        testBtn = tv("השמעת דוגמה") { Voice.recheck(this); Handler(Looper.getMainLooper()).postDelayed({ refresh(); Voice.speak(this, "שלום, אני עזר") }, 1500) }
-        style(testBtn, false)
-
-        cityBtn = tv("") { pickCity() }
-        style(cityBtn, false)
-        roleText = info()
-
-        val permBtn = tv("אישור הרשאות") { requestPermissions(perms, 7) }
-        style(permBtn, true)
-        permSection = section("הרשאות", info("כדי להקשיב, לנגן שירים ולהציג תזכורות צריך לאשר גישה."), permBtn)
-
-        page(
-            header("הגדרות ${Assistant.NAME}"),
-            permSection,
-            section("היי ${Assistant.NAME}", hot, hotCharge, hotLocked, hotOff, hotNote),
-            section("קול", speak, voiceText, voiceBtn, testBtn),
-            section("זמני היום", cityBtn),
-            section("עוזר המערכת", roleText)
-        )
+        hotSub = hot.second; speakSub = speak.second; citySub = city.second; permSub = perm.second; roleSub = role.second
+        page(header("הגדרות ${Assistant.NAME}"), hot.first, speak.first, city.first, perm.first, role.first)
     }
 
-    override fun onResume() { super.onResume(); refresh(); Handler(Looper.getMainLooper()).postDelayed({ refresh() }, 1200) }
-    override fun onRequestPermissionsResult(code: Int, p: Array<out String>, g: IntArray) { super.onRequestPermissionsResult(code, p, g); refresh() }
+    override fun onResume() { super.onResume(); refresh() }
 
     private fun refresh() {
-        voiceText.text = if (Voice.hebrew) "קול עברי זמין ✓" else "לא נמצא קול עברי להקראה"
-        voiceText.setTextColor(if (Voice.hebrew) acc else dim)
-        voiceBtn.visibility = if (!Voice.hebrew && TtsRestore.available(this)) View.VISIBLE else View.GONE
-        testBtn.visibility = if (Voice.hebrew) View.VISIBLE else View.GONE
-        val def = Assistant.isDefault(this)
-        roleText.text = if (def) "${Assistant.NAME} מוגדר כעוזר המערכת ✓" else "${Assistant.NAME} יוגדר כעוזר המערכת אוטומטית באתחול הבא"
-        roleText.setTextColor(if (def) acc else dim)
-        permSection.visibility = if (perms.all { checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }) View.GONE else View.VISIBLE
-        cityBtn.text = Zmanim.city(this).name + " — שינוי"
+        val p = Assistant.prefs(this)
+        hotSub.text = if (Hotword.enabled(this)) "פועל" + (if (Hotword.chargingOnly(this)) " · רק בזמן טעינה" else "") else "כבוי"
+        speakSub.text = "בודק…"
+        Voice.whenReady(this) {
+            speakSub.text = when {
+                !Voice.hebrew -> "אין קול עברי זמין"
+                p.getBoolean("speak", true) -> "פועל · קול עברי זמין"
+                else -> "כבוי · קול עברי זמין"
+            }
+        }
+        citySub.text = Zmanim.city(this).name
+        val miss = Perms.missing(this)
+        permSub.text = when (miss) { 0 -> "כל ההרשאות מאושרות"; 1 -> "חסרה הרשאה אחת"; else -> "חסרות $miss הרשאות" }
+        roleSub.text = if (Assistant.isDefault(this)) "${Assistant.NAME} מוגדר כעוזר המערכת" else "${Assistant.NAME} לא מוגדר כעוזר המערכת · לחיצה להגדרה"
+    }
+
+    // בדיקת הרשאות: מפעיל לבד את מה שאפשר, מבקש את השאר, ומציג סיכום
+    private fun fixPermissions() {
+        Perms.fixSpecial(this)
+        val ask = Perms.runtime().map { it.first }.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
+        if (ask.isNotEmpty()) requestPermissions(ask.toTypedArray(), 7) else h.postDelayed({ summary() }, 700)
+    }
+
+    override fun onRequestPermissionsResult(code: Int, p: Array<out String>, g: IntArray) {
+        super.onRequestPermissionsResult(code, p, g)
+        h.postDelayed({ summary() }, 400)
+    }
+
+    private fun summary() {
+        refresh()
+        val lines = Perms.status(this).joinToString("\n") { (name, ok) -> (if (ok) "✓  " else "✗  ") + name }
+        dlg().setTitle("הרשאות").setMessage(lines).setPositiveButton("סגור", null).show()
     }
 
     private fun pickCity() {

@@ -8,7 +8,8 @@ import java.io.File
 
 // קול עברי אופליין ל-Google TTS (מותקן רק בלחיצה על הכפתור בהגדרות עזר): הנתונים צרובים בקושחה — כתיקייה (/system/etc/ezrim/tts) או כקובץ ZIP אחד
 // (/system/etc/ezrim/tts_he.zip, חוסך "מקומות" של קבצים במחיצת המערכת) — ועזרים מעתיק אותם (עם root)
-// לתיקייה הפרטית של Google TTS — תיקיית הקולות (files/superpacks) וקובץ הרישום (databases/superpacks.db).
+// לתיקייה של Google TTS — תיקיית הקולות (files/superpacks) וקובץ הרישום (databases/superpacks.db).
+// Google TTS שומרת את הקולות באחסון של המכשיר (/data/user_de), שזמין כבר לפני ביטול הנעילה — לא ב-/data/data.
 object TtsRestore {
     private const val PKG = "com.google.android.tts"
     const val DIR = "/system/etc/ezrim/tts"
@@ -42,17 +43,20 @@ object TtsRestore {
     }
 
     // ידני, מהכפתור בהגדרות עזר
+    // done נקרא אחרי ההעתקה; ב-OK — גם אחרי שעזר בדק מחדש אם יש קול עברי
     fun install(c: Context, done: (Result) -> Unit) {
         val app = c.applicationContext
         Thread {
             val r = try { copy(app) } catch (_: Exception) { Result.FAIL }
-            Handler(Looper.getMainLooper()).post { done(r) }
+            Handler(Looper.getMainLooper()).post {
+                if (r == Result.OK) Voice.recheck(app) { done(r) } else done(r)
+            }
         }.start()
     }
 
     private fun copy(c: Context): Result {
         if (!RootShell.hasRoot()) return Result.NO_ROOT
-        val d = "/data/data/$PKG"
+        val d = "/data/user_de/0/$PKG"
         val src = source(c) ?: return Result.FAIL
         val (code, _) = RootShell.run("""
             [ -d $d ] || exit 3   # רץ בתת-מעטפת: לא סוגר את חיבור ה-root
@@ -66,8 +70,6 @@ object TtsRestore {
             chcon -R "${'$'}CTX" $d/files/superpacks $d/databases
         """.trimIndent())
         File(c.filesDir, "tts_stage").deleteRecursively()
-        if (code != 0) return Result.FAIL
-        Handler(Looper.getMainLooper()).post { Voice.recheck(c) }
-        return Result.OK
+        return if (code == 0) Result.OK else Result.FAIL
     }
 }

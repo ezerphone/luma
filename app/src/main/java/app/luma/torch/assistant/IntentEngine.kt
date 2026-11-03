@@ -120,7 +120,7 @@ class IntentEngine {
     }
 
     // ---------- מילים במשפט ----------
-    private class Tok(text: String) {
+    class Tok(text: String) {
         val orig: List<String> = text.replace(Regex("([בלמ])-(\\d)"), "$1$2").replace(Regex("[^\\p{L}\\p{N}:.%]+"), " ").trim()
             .split(' ').map { it.trim('.') }.filter { it.isNotEmpty() }
         // כמו הנרמול של המסווג, אבל שומר נקודתיים (7:30) ומספרים עשרוניים
