@@ -35,12 +35,11 @@ class ChatHistoryActivity : BaseActivity() {
         val chats = ChatStore.list(this, archive)
         picked.retainAll(chats.map { it.id }.toSet())
         if (selecting && chats.isEmpty()) selecting = false
-        val fmt = SimpleDateFormat("EEEE · HH:mm", Locale("he"))
         val items = chats.map { ch ->
             val texts = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 addView(TextView(this@ChatHistoryActivity).apply { text = ch.title; textSize = 15f; setTextColor(fg); typeface = medium; maxLines = 1 })
-                addView(TextView(this@ChatHistoryActivity).apply { text = fmt.format(Date(ch.updated)); textSize = 12f; setTextColor(dim) })
+                addView(TextView(this@ChatHistoryActivity).apply { text = whenText(ch.updated); textSize = 12f; setTextColor(dim) })
             }
             LinearLayout(this).apply {
                 gravity = Gravity.CENTER_VERTICAL; background = shape(card, 18, line); setPadding(dp(14), dp(12), dp(14), dp(12))
@@ -85,7 +84,7 @@ class ChatHistoryActivity : BaseActivity() {
             }
             views += acts
         } else if (archive) {
-            views += header("ארכיון", null, if (items.isEmpty()) null else "${items.size} שיחות")
+            views += header("ארכיון", null, when (items.size) { 0 -> null; 1 -> "שיחה אחת"; else -> "${items.size} שיחות" })
             views += items
             if (items.isEmpty()) views += TextView(this).apply { text = "אין שיחות בארכיון"; textSize = 13f; setTextColor(dim); gravity = Gravity.CENTER }
             else views += TextView(this).apply { text = "לחיצה ארוכה על שיחה — אפשרויות"; textSize = 12f; setTextColor(dim); gravity = Gravity.CENTER }
@@ -108,6 +107,26 @@ class ChatHistoryActivity : BaseActivity() {
             }
         }
         page(*views.toTypedArray())
+    }
+
+    // מתי עודכנה השיחה: היום / אתמול / יום בשבוע (עד שבוע) / תאריך
+    private fun whenText(t: Long): String {
+        val he = Locale("he")
+        val time = SimpleDateFormat("HH:mm", he).format(Date(t))
+        fun day0(ms: Long) = java.util.Calendar.getInstance().apply {
+            timeInMillis = ms; set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val days = Math.round((day0(System.currentTimeMillis()).timeInMillis - day0(t).timeInMillis) / 86400000.0).toInt()
+        val sameYear = day0(t).get(java.util.Calendar.YEAR) == day0(System.currentTimeMillis()).get(java.util.Calendar.YEAR)
+        val d = when {
+            days <= 0 -> "היום"
+            days == 1 -> "אתמול"
+            days < 7 -> SimpleDateFormat("EEEE", he).format(Date(t))
+            sameYear -> SimpleDateFormat("d.M", he).format(Date(t))
+            else -> SimpleDateFormat("d.M.yy", he).format(Date(t))
+        }
+        return "$d · $time"
     }
 
     private fun pill(res: Int, t: String, color: Int, click: () -> Unit) = LinearLayout(this).apply {

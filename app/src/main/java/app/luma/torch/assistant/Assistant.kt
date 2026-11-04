@@ -37,12 +37,10 @@ object Assistant {
 
     @Volatile private var nlu: OfflineNlu? = null
     private val slots = IntentEngine()
-    private var jokes: List<String> = emptyList()
 
     fun engine(c: Context): OfflineNlu = nlu ?: synchronized(this) {
         nlu ?: OfflineNlu(c.assets.open("assistant/nlu_model.bin").use { it.readBytes() },
             c.assets.open("assistant/nlu_labels.txt").bufferedReader().readLines().map { it.trim() }.filter { it.isNotEmpty() }).also {
-            jokes = try { c.assets.open("assistant/jokes.txt").bufferedReader().readLines().filter { l -> '|' in l } } catch (_: Exception) { emptyList() }
             nlu = it
         }
     }
@@ -97,7 +95,7 @@ object Assistant {
     private val GONE = setOf("call_contact", "call_back", "recent_calls", "contact_number", "message_send", "driving_on", "driving_off",
         "wifi_on", "wifi_off", "transit_route", "bus_line", "name_ask_user", "name_set_user", "name_set_assistant", "knowledge_query",
         "voice_record", "bracha_query", "saying", "daf_yomi", "tehillim", "fun_fact", "suggest_food", "breathing", "shabbat_on", "shabbat_off",
-        "parking_save", "parking_find")
+        "parking_save", "parking_find", "joke")
     private val REPEAT = listOf("תחזור על זה", "תחזור שוב", "תגיד שוב", "מה אמרת", "תחזור על התשובה").map { IntentEngine.n(it) }
     @Volatile private var last = ""   // התשובה האחרונה ("תחזור על זה")
     private val OPEN_VERBS = listOf("תפתח", "תפתחי", "פתח", "פתחי", "לפתוח", "תיכנס", "תכנס", "כנס", "היכנס", "להיכנס", "תפעיל", "הפעל", "תריץ", "תקפיץ")
@@ -121,7 +119,7 @@ object Assistant {
     // במסך נעול: מידע כללי ושליטה במוזיקה — בלי קוד. כל השאר (פעולות ומידע מהמכשיר) — צריך לפתוח את הנעילה קודם
     private val FREE_WHEN_LOCKED = setOf("time_query", "date_query", "world_time", "date_calc", "holiday_when", "hebrew_date_when",
         "years_since", "zmanim", "parasha", "rosh_chodesh", "omer", "molad", "vat", "calc", "convert_units", "repeat", "random",
-        "cancel", "greeting", "thanks", "help", "joke", "how_are_you", "goodbye", "name_ask_assistant", "compliment", "feeling",
+        "cancel", "greeting", "thanks", "help", "how_are_you", "goodbye", "name_ask_assistant", "compliment", "feeling",
         "cheer_up", "complaint", "media_pause", "media_play", "media_next", "media_prev", "play_song", "now_playing", "sleep_timer")
 
     fun needsUnlock(c: Context, said: String): Boolean {
@@ -245,7 +243,6 @@ object Assistant {
             "greeting" -> Reply(Say.GREETING)
             "thanks" -> Reply(Say.THANKS)
             "help" -> Reply(Say.HELP)
-            "joke" -> jokes.randomOrNull()?.split('|')?.let { Reply(it[0] + "\n" + it.getOrElse(1) { "" }) } ?: Reply("אין לי בדיחה כרגע")
             "how_are_you" -> Reply("ברוך השם, מצוין! ומה איתך?")
             "goodbye" -> Reply("להתראות!", then = {})
             "name_ask_assistant" -> Reply("קוראים לי $NAME")

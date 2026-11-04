@@ -35,7 +35,7 @@ class DictationActivity : BaseActivity(), SpeechEngine.Observer {
         // שגיאה מוצגת רק כשיש תקלה (מודל חסר או כשל בטעינה); במצב תקין אין שורת מצב
         detail = TextView(this).apply {
             textSize = 12f; setTextColor(warnC); setLineSpacing(0f, 1.2f)
-            typeface = android.graphics.Typeface.MONOSPACE; setTextIsSelectable(true)
+            setTextIsSelectable(true)
         }
 
         // הפעלת המקלדת ברשימת המקלדות של המערכת

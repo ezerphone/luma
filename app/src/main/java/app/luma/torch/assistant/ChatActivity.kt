@@ -142,6 +142,11 @@ class ChatActivity : BaseActivity(), Listen.Callback {
     override fun onPartial(text: String) { input.hint = text }
     override fun onFinal(text: String) { idleMic(); ask(text) }
     override fun onNothing() { idleMic(); voiceMode = false }
+    // זיהוי הדיבור לא נטען: מחזירים את השדה למצב רגיל ואומרים מה לעשות
+    override fun onUnavailable() {
+        idleMic(); voiceMode = false
+        Toast.makeText(this, "זיהוי הדיבור לא נטען · נסה להפעיל מחדש את המכשיר", Toast.LENGTH_LONG).show()
+    }
 
     override fun onPause() { listen?.cancel(); Voice.stop(); idleMic(); super.onPause() }
 

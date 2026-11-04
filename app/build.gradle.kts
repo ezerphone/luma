@@ -5,7 +5,7 @@ android {
     defaultConfig {
         applicationId = "com.android.adds"; minSdk = 29; targetSdk = 34
         // מספר הגרסה: מתעדכן ידנית לפי סוג השינוי (תיקונים 1.1.x, תכונות 1.x, שינוי גדול x)
-        versionName = "1.1.0"
+        versionName = "1.1.1"
         // מספר הבנייה: עולה לבד בכל בנייה בגיטהאב (מספר הריצה); בבנייה מקומית — 7
         versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 7
     }
