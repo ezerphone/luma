@@ -96,7 +96,7 @@ class MockLocationActivity : BaseActivity() {
                     Torch.mockLocationApps = Torch.mockLocationApps + pkg
                     refreshList()
                 } else {
-                    showErr("הפעולה נכשלה: $err")
+                    showErr("הפעולה נכשלה")
                 }
             }
         }.start()
@@ -111,7 +111,7 @@ class MockLocationActivity : BaseActivity() {
                     Torch.mockLocationApps = Torch.mockLocationApps - pkg
                     refreshList()
                 } else {
-                    showErr("הביטול נכשל: $err")
+                    showErr("הביטול נכשל")
                 }
             }
         }.start()

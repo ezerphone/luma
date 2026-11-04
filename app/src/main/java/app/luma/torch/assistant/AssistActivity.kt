@@ -122,7 +122,7 @@ class AssistActivity : BaseActivity(), Listen.Callback {
         micBtn = FrameLayout(this).apply {
             addView(micIcon, FrameLayout.LayoutParams(-1, -1))
             addView(micWave, FrameLayout.LayoutParams(dp(22), dp(18), Gravity.CENTER))
-            setOnClickListener { if (listen?.isListening == true) listen?.stop() else startListening() }
+            setOnClickListener { if (listen?.isListening == true) listen?.stop() else startListening(tap = true) }
         }
         sendBtn = ImageView(this).apply { setPadding(dp(11), dp(11), dp(11), dp(11)); setOnClickListener { sendTyped() } }
         val glass = LinearLayout(this).apply {
@@ -230,8 +230,8 @@ class AssistActivity : BaseActivity(), Listen.Callback {
 
     private fun canListen() = ModelLocator.isInstalled() && checkSelfPermission(Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED
 
-    private fun startListening() {
-        if (!canListen()) return
+    private fun startListening(tap: Boolean = false) {
+        if (!canListen()) { if (tap) cantListen(); return }
         h.removeCallbacks(close); Voice.stop()
         (listen ?: Listen(this, this).also { listen = it }).start()
     }
@@ -270,6 +270,13 @@ class AssistActivity : BaseActivity(), Listen.Callback {
             val r = try { Assistant.handle(this, text) } catch (_: Exception) { Assistant.Reply(Assistant.Say.ERROR) }
             runOnUiThread { ChatStore.add(this, chat, true, text); show(text, r, voice) }
         }.start()
+    }
+
+    // לחיצה על המיקרופון כשאי אפשר להקשיב: אומרים למה
+    private fun cantListen() {
+        answered = true; orb.big = false; big.textSize = 19f
+        if (!ModelLocator.isInstalled()) { small.text = ""; big.text = "זיהוי הדיבור לא זמין במכשיר הזה" }
+        else { small.text = "הגדרות עזר ← הגדרות נוספות ← הרשאות"; big.text = "צריך לאשר מיקרופון" }
     }
 
     private fun locked() = getSystemService(android.app.KeyguardManager::class.java)?.isKeyguardLocked == true

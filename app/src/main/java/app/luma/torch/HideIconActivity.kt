@@ -149,7 +149,7 @@ class HideIconActivity : BaseActivity() {
         )
         true
     } catch (e: SecurityException) {
-        showErr("אין לעזרים הרשאת CHANGE_COMPONENT_ENABLED_STATE. יש להתקין אותה כאפליקציית מערכת עם קובץ ההרשאות המתאים.")
+        showErr("האפשרות הזו לא זמינה במכשיר הזה")
         false
     }
 

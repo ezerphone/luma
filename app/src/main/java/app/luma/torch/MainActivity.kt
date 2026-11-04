@@ -12,6 +12,7 @@ import android.view.Gravity
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
 import android.widget.*
 import app.luma.torch.dictation.DictationActivity
 import app.luma.torch.dictation.ModelLocator
@@ -51,22 +52,6 @@ class MainActivity : BaseActivity() {
         }
     }
 
-    // אם האפליקציה קרסה בפעם הקודמת, מציגים את פירוט הקריסה (אפשר לסמן ולהעתיק)
-    override fun onResume() {
-        super.onResume()
-        val f = java.io.File(filesDir, "last_crash.txt")
-        if (!f.exists()) return
-        val trace = try { f.readText() } catch (_: Exception) { "" }
-        f.delete()
-        if (trace.isBlank()) return
-        val body = TextView(this).apply {
-            text = trace.take(3000); textSize = 11f; setTextColor(fg); typeface = Typeface.MONOSPACE
-            setTextIsSelectable(true); setPadding(dp(20), dp(8), dp(20), dp(8))
-        }
-        dlg().setTitle("האפליקציה קרסה בפעם הקודמת").setView(ScrollView(this).apply { addView(body) })
-            .setPositiveButton("סגור", null).show()
-    }
-
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
         RootShell.warmUp() // בקשת הרשאת root פעם אחת, בפתיחת האפליקציה
@@ -74,10 +59,10 @@ class MainActivity : BaseActivity() {
         try { app.luma.torch.dictation.VoiceIme.ensureDefault(this) } catch (_: Exception) {}
         try { app.luma.torch.assistant.Assistant.ensureDefault(this) } catch (_: Exception) {}
         try { app.luma.torch.assistant.Hotword.sync(this) } catch (_: Exception) {}
-        val btCard = big(R.drawable.ic_bluetooth, "כתובת בלוטוס", "שינוי כתובת MAC (דורש root)", BtAddressActivity::class.java)
+        val btCard = big(R.drawable.ic_bluetooth, "כתובת בלוטוס", "שינוי כתובת MAC", BtAddressActivity::class.java)
         val sysCard = big(R.drawable.ic_statusbar, "הגדרות מערכת", "כפתור סיבוב, עיצוב הסטטוס בר וקיצורים", SystemSettingsActivity::class.java)
         val hideCard = big(R.drawable.ic_hide, "הסתרת אייקונים", "הסתרת אייקון של אפליקציה ממסך הבית", HideIconActivity::class.java)
-        val custCard = big(R.drawable.ic_tune, "התאמה אישית", "מחיקת רדיו/מציג HTML והחזרת המצלמה המקורית (דורש root)", CustomizationActivity::class.java)
+        val custCard = big(R.drawable.ic_tune, "התאמה אישית", if (CustomizationActivity.setupDone()) "בחירת מצלמה" else "רדיו, מציג HTML, חנות ומצלמה — הגדרה חד-פעמית", CustomizationActivity::class.java)
         val mockCard = big(R.drawable.ic_location, "מיקום מדומה", "מתן הרשאת מיקום מזויף לאפליקציה", MockLocationActivity::class.java)
         pageWithFooter(
             footer(),
@@ -101,7 +86,11 @@ class MainActivity : BaseActivity() {
         Thread {
             val ok = RootShell.hasRoot() // התוצאה של הבדיקה היחידה בכניסה
             runOnUiThread {
-                rootCards.forEach { it.alpha = if (ok) 1f else 0.4f; it.isEnabled = ok }
+                rootCards.forEach {
+                    it.alpha = if (ok) 1f else 0.4f; it.isEnabled = ok
+                    // "דורש root" מופיע רק כשאין root
+                    if (!ok) ((it as? ViewGroup)?.getChildAt(1) as? ViewGroup)?.getChildAt(1)?.let { t -> (t as? TextView)?.append(" · דורש root") }
+                }
             }
         }.start()
     }

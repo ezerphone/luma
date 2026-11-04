@@ -43,10 +43,39 @@ object Extras {
     private val DIV = set("חלקי", "חלק", "לחלק", "מחולק", "/", "÷")
     private val PERCENT_OF = set("אחוז", "אחוזים", "%")
 
+    // סימנים מוקלדים (5+3, 10/2, 4*3, 7-2) → מילים, כי הניקוי של הטקסט מוחק סימנים
+    private fun symbols(s: String) = s
+        .replace(Regex("(\\d)\\s*-\\s*(?=\\d)"), "$1 פחות ")
+        .replace(Regex("(\\d)\\s*[xX]\\s*(?=\\d)"), "$1 כפול ")
+        .replace("+", " ועוד ").replace("*", " כפול ").replace("×", " כפול ")
+        .replace("/", " חלקי ").replace("÷", " חלקי ").replace("%", " % ")
+
+    // חשבון רק כשהמשפט נשמע כמו חשבון: מתחיל ב"כמה" / "תחשב" / "מה זה", או שכולו מספרים ופעולות.
+    // ככה "תוסיף לקניות 2 חלב ועוד 3 לחם" לא נענה ב"התוצאה: 5"
+    private val MATH_START = listOf("כמה", "תחשב", "תחשבי", "חשב", "לחשב", "מה זה", "מה התוצאה", "מה יוצא").map { n(it) }
+    fun isMath(said: String): Boolean {
+        val t = IntentEngine.Tok(symbols(said))
+        val words = t.norm.filter { it.isNotBlank() && it !in IntentEngine.FILLER }
+        if (words.isEmpty()) return false
+        val joined = words.joinToString(" ")
+        if (MATH_START.any { joined == it || joined.startsWith("$it ") }) return true
+        var i = 0
+        while (i < t.norm.size) {
+            val w = t.norm[i]
+            when {
+                w.isBlank() || w in IntentEngine.FILLER -> i++
+                w.trimStart('ב', 'ל', 'ו').toDoubleOrNull() != null -> i++
+                t.number(i) != null -> i += t.number(i)!!.second
+                w in PLUS || w in MINUS || w in TIMES || w in DIV || w in PERCENT_OF -> i++
+                else -> return false
+            }
+        }
+        return true
+    }
+
     // מחזיר תשובה אם במשפט יש חשבון (שני מספרים לפחות ופעולה), אחרת null
     fun calc(said: String): Assistant.Reply? {
-        val spaced = said.replace(Regex("([+\\-*/×÷x%])"), " $1 ")
-        val t = IntentEngine.Tok(spaced)
+        val t = IntentEngine.Tok(symbols(said))
         val nums = mutableListOf<Double>(); val ops = mutableListOf<Char>()
         var i = 0; var pendingPercent = false
         while (i < t.norm.size) {
@@ -168,7 +197,7 @@ object Extras {
 
     // ---------- התראות ----------
     fun notifications(c: Context): Assistant.Reply {
-        val l = MediaListener.instance ?: return Assistant.Reply("צריך לאשר לעזרים גישה להתראות (בהגדרות עזר ← הרשאות)")
+        val l = MediaListener.instance ?: return Assistant.Reply("צריך לאשר לעזרים גישה להתראות (בהגדרות עזר ← הגדרות נוספות ← הרשאות)")
         val pm = c.packageManager
         val items = try { l.activeNotifications.orEmpty() } catch (_: Exception) { emptyArray() }
             .filter { !it.isOngoing && it.packageName != c.packageName && (it.notification.flags and Notification.FLAG_GROUP_SUMMARY) == 0 }
@@ -402,8 +431,10 @@ object Extras {
         return Assistant.Reply("פותח את התמונות", then = { c.startActivity(i) })
     }
 
+    const val STORE_PKG = "com.example.mystore"
     fun store(c: Context): Assistant.Reply {
-        val (label, i) = Assistant.findApp(c, "חנות כשרה") ?: return Assistant.Reply("לא מצאתי במכשיר את החנות הכשרה")
-        return Assistant.Reply("פותח את $label", then = { c.startActivity(i) })
+        val i = c.packageManager.getLaunchIntentForPackage(STORE_PKG)?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            ?: return Assistant.Reply("לא מצאתי במכשיר את החנות הכשרה")
+        return Assistant.Reply("פותח את החנות הכשרה", then = { c.startActivity(i) })
     }
 }

@@ -79,7 +79,7 @@ object Assistant {
         const val THANKS = "בשמחה!"
         const val NEED_A11Y = "צריך להפעיל את שירות הנגישות \"עזרים - קיצורים\""
         const val NO_PERMISSION = "אין לעזרים הרשאה לשנות את זה"
-        const val NEED_MUSIC = "צריך לאשר לעזרים גישה לקבצי המוזיקה (בהגדרות עזר)"
+        const val NEED_MUSIC = "צריך לאשר לעזרים גישה לקבצי המוזיקה (בהגדרות עזר ← הגדרות נוספות ← הרשאות)"
         const val HELP = "אפשר לבקש: לפתוח אפליקציה, פנס, תזכורת, טיימר, שעון מעורר, סטופר, מה השעה, שעה בעולם, תאריך עברי, זמני היום, " +
             "פרשת השבוע, מתי חג, ראש חודש, ספירת העומר, מולד, סוללה, שקט או רטט, ווליום ובהירות, לנגן שיר, מה מתנגן, טיימר שינה, " +
             "פתקים, משימות, רשימת קניות, הוצאות, שתיית מים, מע״מ, מחשבון, המרת יחידות, לוח שנה, הקראת התראות, ניווט, " +
@@ -126,7 +126,7 @@ object Assistant {
     fun needsUnlock(c: Context, said: String): Boolean {
         if (REPEAT.any { IntentEngine.n(said).contains(it) }) return false
         if (isHotwordOff(said)) return true
-        if (Extras.calc(said) != null) return false
+        if (Extras.isMath(said) && Extras.calc(said) != null) return false
         val r = engine(c).classify(said)
         val first = IntentEngine.n(said).split(' ').firstOrNull { it !in IntentEngine.FILLER }
         if (r.label == "open_app" || (first in OPEN_VERBS && r.prob < 0.35f)) {
@@ -147,7 +147,7 @@ object Assistant {
 
     private fun handleInner(c: Context, said: String): Reply {
         hotwordOff(c, said)?.let { return it }
-        Extras.calc(said)?.let { return it }   // "כמה זה 15 כפול 4"
+        if (Extras.isMath(said)) Extras.calc(said)?.let { return it }   // "כמה זה 15 כפול 4"
         val r = engine(c).classify(said)
         val first = IntentEngine.n(said).split(' ').firstOrNull { it !in IntentEngine.FILLER }
         if (r.label == "open_app" || (first in OPEN_VERBS && r.prob < 0.35f)) {

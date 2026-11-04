@@ -132,10 +132,9 @@ class DictationActivity : BaseActivity(), SpeechEngine.Observer {
         val state = SpeechEngine.get(this).state()
         val mic = hasMic()
 
-        val err = SpeechEngine.get(this).lastError()
         detail.text = when {
-            !installed -> "המודל חסר: ${ModelLocator.missing().joinToString(", ")}"
-            state == "error" -> "שגיאה בטעינת המודל" + if (err.isNotEmpty()) "\n$err" else ""
+            !installed -> "זיהוי הדיבור לא זמין במכשיר הזה"
+            state == "error" -> "זיהוי הדיבור לא נטען. נסה להפעיל מחדש את המכשיר"
             else -> ""
         }
         errSection.visibility = if (detail.text.isEmpty()) View.GONE else View.VISIBLE

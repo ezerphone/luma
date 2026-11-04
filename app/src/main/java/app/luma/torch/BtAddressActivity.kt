@@ -59,7 +59,7 @@ class BtAddressActivity : BaseActivity() {
         status = TextView(this).apply { textSize = 14f; setTextColor(dim); gravity = Gravity.CENTER; setPadding(dp(8), 0, dp(8), dp(16)); visibility = View.GONE }
 
         val info = TextView(this).apply {
-            text = "השינוי דורש הרשאת root, ומתבצע דרך הגדרות המערכת. הבלוטוס יכבה וידלק מחדש."
+            text = "השינוי מתבצע דרך הגדרות המערכת. הבלוטוס יכבה וידלק מחדש."
             textSize = 13f; setTextColor(dim); setLineSpacing(0f, 1.2f)
         }
         page(

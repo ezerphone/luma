@@ -129,7 +129,7 @@ class ChatActivity : BaseActivity(), Listen.Callback {
     private fun canListen() = ModelLocator.isInstalled() && checkSelfPermission(Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED
 
     private fun startListening() {
-        if (!canListen()) { Toast.makeText(this, "צריך לאשר מיקרופון (בהגדרות עזר)", Toast.LENGTH_LONG).show(); return }
+        if (!canListen()) { Toast.makeText(this, if (!ModelLocator.isInstalled()) "זיהוי הדיבור לא זמין במכשיר הזה" else "צריך לאשר מיקרופון (בהגדרות עזר ← הגדרות נוספות ← הרשאות)", Toast.LENGTH_LONG).show(); return }
         Voice.stop(); voiceMode = true
         (listen ?: Listen(this, this).also { listen = it }).start()
         input.hint = "רגע…"
