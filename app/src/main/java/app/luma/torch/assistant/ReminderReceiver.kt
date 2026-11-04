@@ -16,7 +16,12 @@ class ReminderReceiver : BroadcastReceiver() {
         val id = i.getIntExtra("id", 0)
         Assistant.done(c, id)
         if (i.getBooleanExtra("pause", false)) { Assistant.pauseMedia(c); return }
-        val text = i.getStringExtra("text") ?: "תזכורת"
+        show(c, id, i.getStringExtra("text") ?: "תזכורת")
+    }
+
+    companion object {
+        const val CH = "assistant_reminders"
+        fun show(c: Context, id: Int, text: String) {
         val nm = c.getSystemService(NotificationManager::class.java)
         if (nm.getNotificationChannel(CH) == null) {
             nm.createNotificationChannel(NotificationChannel(CH, "תזכורות של עזר", NotificationManager.IMPORTANCE_HIGH).apply {
@@ -29,8 +34,8 @@ class ReminderReceiver : BroadcastReceiver() {
         val open = android.app.PendingIntent.getActivity(c, id, Intent(c, ChatHistoryActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT)
         nm.notify(id, Notification.Builder(c, CH).setSmallIcon(R.drawable.ic_mic).setContentTitle(Assistant.NAME).setContentText(text)
-            .setCategory(Notification.CATEGORY_REMINDER).setContentIntent(open).setAutoCancel(true).build())
+            .setCategory(Notification.CATEGORY_REMINDER).setContentIntent(open).setAutoCancel(true)
+            .setStyle(Notification.BigTextStyle().bigText(text)).build())
+        }
     }
-
-    companion object { const val CH = "assistant_reminders" }
 }

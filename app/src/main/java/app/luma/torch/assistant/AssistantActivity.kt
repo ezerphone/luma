@@ -11,17 +11,19 @@ class AssistantActivity : BaseActivity() {
     private lateinit var hotSub: TextView
     private lateinit var speakSub: TextView
     private lateinit var citySub: TextView
+    private lateinit var remSub: TextView
 
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
         Voice.init(this)
         val hot = navCard(R.drawable.ic_mic, "היי ${Assistant.NAME}") { startActivity(Intent(this, HotwordActivity::class.java)) }
         val speak = navCard(R.drawable.ic_speaker, "הקראת תשובות") { startActivity(Intent(this, SpeakActivity::class.java)) }
+        val rem = navCard(R.drawable.ic_alarm, "תזכורות") { startActivity(Intent(this, RemindersActivity::class.java)) }
         val city = navCard(R.drawable.ic_sun, "זמני היום") { pickCity() }
         val more = navCard(R.drawable.ic_settings, "הגדרות נוספות") { startActivity(Intent(this, MoreSettingsActivity::class.java)) }
         more.second.text = "הרשאות, עוזר המערכת, בועת הצ׳אט"
-        hotSub = hot.second; speakSub = speak.second; citySub = city.second
-        page(header("הגדרות ${Assistant.NAME}"), hot.first, speak.first, city.first, more.first)
+        hotSub = hot.second; speakSub = speak.second; citySub = city.second; remSub = rem.second
+        page(header("הגדרות ${Assistant.NAME}"), hot.first, speak.first, rem.first, city.first, more.first)
     }
 
     override fun onResume() { super.onResume(); refresh() }
@@ -38,6 +40,7 @@ class AssistantActivity : BaseActivity() {
             }
         }
         citySub.text = Zmanim.city(this).name
+        remSub.text = Assistant.openReminders(this).size.let { n -> when (n) { 0 -> "אין תזכורות פתוחות"; 1 -> "תזכורת אחת פתוחה"; else -> "$n תזכורות פתוחות" } }
     }
 
     private fun pickCity() {

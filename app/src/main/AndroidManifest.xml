@@ -61,6 +61,7 @@
         <activity android:name=".assistant.HotwordActivity" android:exported="false"/>
         <activity android:name=".assistant.SpeakActivity" android:exported="false"/>
         <activity android:name=".assistant.MoreSettingsActivity" android:exported="false"/>
+        <activity android:name=".assistant.RemindersActivity" android:exported="false"/>
         <activity android:name=".assistant.ChatActivity" android:exported="false" android:windowSoftInputMode="adjustResize"/>
         <activity android:name=".assistant.ChatHistoryActivity" android:exported="false"/>
         <!-- "היי עזר": האזנה ברקע (רק כשהמשתמש הפעיל את המתג) -->

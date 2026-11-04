@@ -123,6 +123,7 @@ object Assistant {
         "cheer_up", "complaint", "media_pause", "media_play", "media_next", "media_prev", "play_song", "now_playing", "sleep_timer")
 
     fun needsUnlock(c: Context, said: String): Boolean {
+        if (pendingAnswer(said) != null) return true   // אישור ביטול תזכורת — פעולה במכשיר
         if (REPEAT.any { IntentEngine.n(said).contains(it) }) return false
         if (isHotwordOff(said)) return true
         if (Extras.isMath(said) && Extras.calc(said) != null) return false
@@ -145,6 +146,7 @@ object Assistant {
     }
 
     private fun handleInner(c: Context, said: String): Reply {
+        if (pending != null) confirmCancel(c, said)?.let { return it }   // תשובה ל"לבטל את תזכורת…? כן / לא"
         hotwordOff(c, said)?.let { return it }
         if (Extras.isMath(said)) Extras.calc(said)?.let { return it }   // "כמה זה 15 כפול 4"
         val r = engine(c).classify(said)
@@ -212,7 +214,7 @@ object Assistant {
             // תזכורות
             "reminder" -> reminder(c, u)
             "reminder_list" -> reminderList(c)
-            "reminder_cancel" -> reminderCancel(c, u.text)
+            "reminder_cancel" -> reminderCancel(c, u.text, said)
             "alarm_list" -> start(c, Intent(AlarmClock.ACTION_SHOW_ALARMS), "פותח את רשימת השעונים")
             // רשימות
             "note_add" -> listAdd(c, "notes", u.text, "רשמתי פתק: ")
@@ -596,44 +598,109 @@ object Assistant {
         val at = u.time ?: if (u.dayOffset > 0) LocalDate.now().plusDays(u.dayOffset.toLong()).atTime(9, 0) else null
         val what = u.text ?: "תזכורת"
         if (at == null) return Reply("מתי להזכיר לך $what?")
-        schedule(c, at, what)
-        return Reply("אזכיר לך ${whenText(at)}: $what", notif = true)
+        val num = schedule(c, at, what)
+        return Reply("אזכיר לך ${whenText(at)}: $what (תזכורת $num)", notif = true)
     }
 
-    private fun whenText(at: LocalDateTime): String {
-        val day = when (at.toLocalDate()) { LocalDate.now() -> ""; LocalDate.now().plusDays(1) -> "מחר "; else -> "ב${dayName(at.toLocalDate())} " }
+    // "ב-9:00", "מחר ב-9:00", "ביום שלישי ב-9:00" (עד שבוע), "ב-20.11 ב-9:00" (רחוק יותר)
+    fun whenText(at: LocalDateTime): String {
+        val d = at.toLocalDate(); val today = LocalDate.now()
+        val diff = ChronoUnit.DAYS.between(today, d)
+        val day = when {
+            diff == 0L -> ""
+            diff == 1L -> "מחר "
+            diff == -1L -> "אתמול "
+            diff in 2L..6L || diff in -6L..-2L -> "ב${dayName(d)} "
+            d.year == today.year -> "ב-${d.dayOfMonth}.${d.monthValue} "
+            else -> "ב-${d.dayOfMonth}.${d.monthValue}.${d.year % 100} "
+        }
         return "${day}ב-${hm(at)}"
     }
 
     private fun reminders(c: Context) = JSONArray(prefs(c).getString("reminders", "[]"))
 
+    // תזכורת פתוחה: מזהה פנימי, מספר סידורי קבוע (מה שהמשתמש רואה ואומר), טקסט וזמן
+    class Rem(val id: Int, val num: Int, val text: String, val at: LocalDateTime) {
+        val line get() = "$num · $text · ${whenText(at)}"
+    }
+
+    // מספר סידורי לכל תזכורת: נקבע ביצירה ולא משתנה. לתזכורות ישנות בלי מספר — נותנים עכשיו
+    private fun nextNum(c: Context): Int { val n = prefs(c).getInt("rem_seq", 0) + 1; prefs(c).edit().putInt("rem_seq", n).apply(); return n }
+    private fun numbered(c: Context): JSONArray {
+        val l = reminders(c); var changed = false
+        for (i in 0 until l.length()) { val o = l.getJSONObject(i); if (!o.optBoolean("pause") && o.optInt("n", 0) == 0) { o.put("n", nextNum(c)); changed = true } }
+        if (changed) prefs(c).edit().putString("reminders", l.toString()).apply()
+        return l
+    }
+
+    // התזכורות הפתוחות (בלי טיימר שינה), מהקרובה לרחוקה — גם למסך התזכורות
+    fun openReminders(c: Context): List<Rem> {
+        val l = numbered(c); val now = System.currentTimeMillis()
+        return (0 until l.length()).map { l.getJSONObject(it) }.filter { it.getLong("at") > now && !it.optBoolean("pause") }.sortedBy { it.getLong("at") }
+            .map { Rem(it.getInt("id"), it.optInt("n"), it.getString("text"), LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(it.getLong("at")), ZoneId.systemDefault())) }
+    }
+
+    fun cancelReminder(c: Context, id: Int) { cancelAlarm(c, id); done(c, id) }
+
     private fun reminderList(c: Context): Reply {
-        val l = reminders(c); val now = System.currentTimeMillis()
-        val items = (0 until l.length()).map { l.getJSONObject(it) }.filter { it.getLong("at") > now && !it.optBoolean("pause") }.sortedBy { it.getLong("at") }
+        val items = openReminders(c)
         if (items.isEmpty()) return Reply("אין תזכורות")
-        return Reply("התזכורות שלך:\n" + items.joinToString("\n") {
-            "• " + whenText(LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(it.getLong("at")), ZoneId.systemDefault())) + ": " + it.getString("text") })
+        return Reply("התזכורות שלך:\n" + items.joinToString("\n") { it.line })
     }
 
-    private fun reminderCancel(c: Context, text: String?): Reply {
-        val l = reminders(c); val now = System.currentTimeMillis()
-        val items = (0 until l.length()).map { l.getJSONObject(it) }.filter { it.getLong("at") > now && !it.optBoolean("pause") }.sortedBy { it.getLong("at") }
+    // ביטול בקול: לפי מספר — מיד; לפי שם — רק אחרי "כן"; בלי כלום — שואלים איזו
+    @Volatile private var pending: Pair<Rem, Long>? = null
+    private val YES = listOf("כן", "כן כן", "כן בבקשה", "אישור", "מאשר", "מאשרת", "נכון", "בטח", "תבטל", "תבטלי", "בטל", "לבטל").map { IntentEngine.n(it) }.toSet()
+    private val NO = listOf("לא", "לא לא", "לא תודה", "עזוב", "עזבי", "אל תבטל", "אל תבטלי", "לא צריך", "תשאיר", "תשאירי", "ביטול").map { IntentEngine.n(it) }.toSet()
+    private fun pendingAnswer(said: String): Boolean? {
+        val p = pending ?: return null
+        if (System.currentTimeMillis() > p.second) { pending = null; return null }
+        val t = IntentEngine.n(said).split(' ').filter { it.isNotEmpty() && it !in IntentEngine.FILLER }.joinToString(" ")
+        return when (t) { in YES -> true; in NO -> false; else -> null }
+    }
+    private fun confirmCancel(c: Context, said: String): Reply? {
+        val yes = pendingAnswer(said) ?: run { pending = null; return null }
+        val r = pending!!.first; pending = null
+        if (!yes) return Reply("בסדר, לא ביטלתי")
+        if (openReminders(c).none { it.id == r.id }) return Reply("תזכורת ${r.num} כבר לא קיימת")
+        cancelReminder(c, r.id)
+        return Reply("ביטלתי את תזכורת ${r.num}: ${r.text}")
+    }
+
+    // מספר התזכורת במשפט: מספר שבא מיד אחרי "תזכורת" / "מספר" ("תבטל תזכורת 2", "את תזכורת מספר שלוש")
+    private val NUM_BEFORE = listOf("תזכורת", "התזכורת", "מספר", "מס").map { IntentEngine.n(it) }.toSet()
+    private fun reminderNum(said: String): Int? {
+        val t = IntentEngine.Tok(said)
+        for (i in 1 until t.norm.size) if (t.norm[i - 1] in NUM_BEFORE) t.number(i)?.let { return it.first }
+        return null
+    }
+
+    private fun reminderCancel(c: Context, text: String?, said: String): Reply {
+        val items = openReminders(c)
         if (items.isEmpty()) return Reply("אין תזכורות לבטל")
-        val q = IntentEngine.n(text.orEmpty())
-        // ביקשו תזכורת מסוימת ולא נמצאה — לא מבטלים אחרת במקומה. בלי פירוט — הקרובה
-        val hit = if (q.isBlank()) items.first() else items.firstOrNull { match(IntentEngine.n(it.getString("text")), q) }
-            ?: return Reply("לא מצאתי תזכורת על ${text.orEmpty().trim()}")
-        cancelAlarm(c, hit.getInt("id")); done(c, hit.getInt("id"))
-        return Reply("ביטלתי את התזכורת: ${hit.getString("text")}")
+        val words = text.orEmpty().split(' ').filter { it.isNotBlank() && IntentEngine.n(it) !in NUM_BEFORE }
+        val num = reminderNum(said)
+        if (num != null) {
+            val r = items.firstOrNull { it.num == num } ?: return Reply("אין תזכורת מספר $num")
+            cancelReminder(c, r.id)
+            return Reply("ביטלתי את תזכורת ${r.num}: ${r.text}")
+        }
+        val q = IntentEngine.n(words.joinToString(" "))
+        if (q.isBlank()) return Reply("איזו תזכורת לבטל? אמור את המספר:\n" + items.joinToString("\n") { it.line })
+        val r = items.firstOrNull { match(IntentEngine.n(it.text), q) } ?: return Reply("לא מצאתי תזכורת על ${words.joinToString(" ")}")
+        pending = r to System.currentTimeMillis() + 90_000
+        return Reply("לבטל את תזכורת ${r.num}: ${r.text} (${whenText(r.at)})? אמור כן או לא")
     }
 
-    fun schedule(c: Context, at: LocalDateTime, text: String, pause: Boolean = false) {
+    fun schedule(c: Context, at: LocalDateTime, text: String, pause: Boolean = false): Int {
         val id = (System.currentTimeMillis() % Int.MAX_VALUE).toInt()
         val ms = at.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-        val list = reminders(c)
-        list.put(JSONObject().put("id", id).put("at", ms).put("text", text).put("pause", pause))
+        val list = numbered(c)
+        val num = if (pause) 0 else nextNum(c)
+        list.put(JSONObject().put("id", id).put("at", ms).put("text", text).put("pause", pause).put("n", num))
         prefs(c).edit().putString("reminders", list.toString()).apply()
         arm(c, id, ms, text, pause)
+        return num
     }
 
     private fun pi(c: Context, id: Int, text: String, pause: Boolean) = PendingIntent.getBroadcast(c, id,
@@ -657,6 +724,10 @@ object Assistant {
             val o = list.getJSONObject(i)
             if (o.getLong("at") > System.currentTimeMillis() - 60_000) {
                 keep.put(o); arm(c, o.getInt("id"), maxOf(o.getLong("at"), System.currentTimeMillis() + 5000), o.getString("text"), o.optBoolean("pause"))
+            } else if (!o.optBoolean("pause")) {
+                // הזמן עבר בזמן שהמכשיר היה כבוי: מציגים אותה עכשיו, עם הזמן המקורי (טיימר שינה שעבר — פשוט נמחק)
+                val at = LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(o.getLong("at")), ZoneId.systemDefault())
+                try { ReminderReceiver.show(c, o.getInt("id"), "תזכורת שהוחמצה (${whenText(at)}): ${o.getString("text")}") } catch (_: Exception) {}
             }
         }
         prefs(c).edit().putString("reminders", keep.toString()).apply()
