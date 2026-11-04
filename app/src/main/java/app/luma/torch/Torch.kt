@@ -25,7 +25,6 @@ object Torch {
     var sens: Int get() = sp.getInt("sn", 0); set(v) = sp.edit().putInt("sn", v).apply() // רגישות ניעור: 0 נמוכה, 1 בינונית, 2 גבוהה
     var mockLocationApps: Set<String> get() = sp.getStringSet("mock_loc_apps", emptySet()) ?: emptySet()
         set(v) = sp.edit().putStringSet("mock_loc_apps", HashSet(v)).apply()
-    var cameraChoice: Int get() = sp.getInt("cam_choice", 0); set(v) = sp.edit().putInt("cam_choice", v).apply() // 0 לא נבחר, 1 מקורית, 2 משודרגת
     var btMac: String get() = sp.getString("btm", "") ?: ""; set(v) = sp.edit().putString("btm", v).apply()
     var sound: Boolean get() = sp.getBoolean("snd", true); set(v) = sp.edit().putBoolean("snd", v).apply()
     var theme: Int get() = sp.getInt("th", 0); set(v) = sp.edit().putInt("th", v).apply() // 0 auto,1 light,2 dark

@@ -14,6 +14,7 @@ class Listen(c: Context, private val cb: Callback) : SpeechEngine.Observer {
         fun onFinal(text: String)
         fun onNothing()
         fun onLoading() {}   // מודל הזיהוי עוד נטען
+        fun onUnavailable() {}   // מודל הזיהוי לא נטען (שגיאה)
     }
 
     private val engine = SpeechEngine.get(c)
@@ -61,5 +62,9 @@ class Listen(c: Context, private val cb: Callback) : SpeechEngine.Observer {
         if (ok) { active = true; cb.onListening(); h.postDelayed(nothing, 12000) }
     }
 
-    override fun onState(state: String) { tryStart() }
+    override fun onState(state: String) {
+        // הטעינה נכשלה: מפסיקים לחכות ומודיעים (אחרת "רגע…" נשאר לתמיד)
+        if (state == "error" && want) { h.removeCallbacksAndMessages(null); finish(); cb.onUnavailable(); return }
+        tryStart()
+    }
 }

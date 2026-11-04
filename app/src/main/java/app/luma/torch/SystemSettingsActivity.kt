@@ -74,7 +74,7 @@ class SystemSettingsActivity : BaseActivity() {
 
     private fun noPermission() {
         rotSw.isEnabled = false; rotSw.alpha = 0.4f
-        rotStatus.text = "אין לעזרים הרשאת WRITE_SECURE_SETTINGS (נדרשת התקנה כאפליקציית מערכת)."
+        rotStatus.text = "האפשרות הזו לא זמינה במכשיר הזה"
         rotStatus.visibility = View.VISIBLE
     }
 

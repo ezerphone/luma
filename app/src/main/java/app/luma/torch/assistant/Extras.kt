@@ -190,7 +190,7 @@ object Extras {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         if (i.resolveActivity(c.packageManager) == null) {
             Assistant.schedule(c, at, title)
-            return Assistant.Reply("אין במכשיר לוח שנה, אז קבעתי תזכורת ב-${Assistant.hm(at)}: $title")
+            return Assistant.Reply("אין במכשיר לוח שנה, אז קבעתי תזכורת ב-${Assistant.hm(at)}: $title", notif = true)
         }
         return Assistant.Reply("פותח את לוח השנה עם האירוע: $title", then = { c.startActivity(i) })
     }

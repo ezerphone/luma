@@ -87,7 +87,8 @@ object Assistant {
     }
 
     // then: פעולה שמתבצעת מיד אחרי שהחלונית נסגרת (פתיחת אפליקציה, מסך הבית…)
-    class Reply(val text: String, val delayed: (() -> Unit)? = null, val then: (() -> Unit)? = null)
+    // notif: התשובה קבעה תזכורת — צריך הרשאת התראות כדי שהיא תופיע
+    class Reply(val text: String, val delayed: (() -> Unit)? = null, val then: (() -> Unit)? = null, val notif: Boolean = false)
 
     private val INTERNAL = mapOf("reminder_add" to "reminder", "timer_set" to "timer", "alarm_set" to "alarm", "zmanim_all" to "zmanim",
         "battery_query" to "battery", "dnd_on" to "ringer_silent", "vibrate_mode" to "ringer_vibrate", "dnd_off" to "ringer_normal",
@@ -580,7 +581,7 @@ object Assistant {
         val what = u.text ?: "תזכורת"
         if (at == null) return Reply("מתי להזכיר לך $what?")
         schedule(c, at, what)
-        return Reply("אזכיר לך ${whenText(at)}: $what")
+        return Reply("אזכיר לך ${whenText(at)}: $what", notif = true)
     }
 
     private fun whenText(at: LocalDateTime): String {

@@ -10,19 +10,28 @@ class SettingsActivity : BaseActivity() {
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
         val export = tv("ייצוא דוח שגיאות") { exportReport() }.apply { style(this, false) }
+        val ver = android.widget.TextView(this).apply {
+            text = "עזרים · " + version(); textSize = 12f; setTextColor(dim); gravity = android.view.Gravity.CENTER
+            setPadding(0, dp(10), 0, 0)
+        }
         page(
             header("הגדרות", null, "מראה האפליקציה"),
             section("תצוגה", group(listOf("אוטומטי", "בהיר", "כהה"), { Torch.theme }) { Torch.theme = it; recreate() }),
-            section("תמיכה", export)
+            section("תמיכה", export, ver)
         )
     }
+
+    // "גרסה 1.1.0 (בנייה 31)"
+    private fun version() = try {
+        val pi = packageManager.getPackageInfo(packageName, 0)
+        "גרסה ${pi.versionName} (בנייה ${pi.longVersionCode})"
+    } catch (_: Exception) { "" }
 
     // דוח שגיאות: פרטי המכשיר + פירוט הקריסה האחרונה (אם הייתה), דרך חלון השיתוף
     private fun exportReport() {
         val trace = try { File(filesDir, "last_crash.txt").takeIf { it.exists() }?.readText().orEmpty() } catch (_: Exception) { "" }
         if (trace.isBlank()) { Toast.makeText(this, "אין שגיאות לדווח", Toast.LENGTH_SHORT).show(); return }
-        val ver = try { packageManager.getPackageInfo(packageName, 0).versionName } catch (_: Exception) { "" }
-        val text = "דוח שגיאות — עזרים $ver\n${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE}\n\n$trace"
+        val text = "דוח שגיאות — עזרים ${version()}\n${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE}\n\n$trace"
         val i = Intent(Intent.ACTION_SEND).setType("text/plain")
             .putExtra(Intent.EXTRA_SUBJECT, "דוח שגיאות — עזרים").putExtra(Intent.EXTRA_TEXT, text)
         try { startActivity(Intent.createChooser(i, "ייצוא דוח שגיאות")) }

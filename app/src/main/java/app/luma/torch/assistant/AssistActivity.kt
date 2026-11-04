@@ -176,7 +176,7 @@ class AssistActivity : BaseActivity(), Listen.Callback {
         }
         setContentView(rootView)
         greet(); paint()
-        val q = intent.getStringExtra("q")
+        val q = trusted(intent)?.getStringExtra("q")
         if (!q.isNullOrBlank()) process(q, voice = true)   // "היי עזר, תדליק פנס" — ישר לביצוע
         else startListening()
     }
@@ -187,10 +187,13 @@ class AssistActivity : BaseActivity(), Listen.Callback {
     override fun onNewIntent(i: Intent) {
         super.onNewIntent(i); setIntent(i)
         h.removeCallbacks(close)
-        if (i.getBooleanExtra("hotword", false)) { chat = ChatStore.create(); answered = false; greet() }   // "היי עזר" חדש = שיחה חדשה
-        val q = i.getStringExtra("q")
+        if (trusted(i)?.getBooleanExtra("hotword", false) == true) { chat = ChatStore.create(); answered = false; greet() }   // "היי עזר" חדש = שיחה חדשה
+        val q = trusted(i)?.getStringExtra("q")
         if (!q.isNullOrBlank()) { listen?.cancel(); Voice.stop(); process(q, voice = true) } else startListening()
     }
+
+    // פקודה מוכנה מבחוץ מתקבלת רק מ"היי עזר" של עזרים (עם הסוד הפנימי); מכל מקור אחר — מתעלמים ממנה
+    private fun trusted(i: Intent): Intent? = i.takeIf { it.getStringExtra("token") == Hotword.token }
 
     private fun openChat() {
         // הצ'אט הוא מידע מהמכשיר: במסך נעול — קודם פותחים את הנעילה
@@ -238,6 +241,10 @@ class AssistActivity : BaseActivity(), Listen.Callback {
 
     // המודל נטען: "רגע…" (החלונית לא נסגרת בינתיים)
     override fun onLoading() { loading = true; h.removeCallbacks(close); if (!answered) small.text = "רגע…"; paint() }
+    override fun onUnavailable() {
+        loading = false; paint(); answered = true; orb.big = false; big.textSize = 19f
+        small.text = "נסה להפעיל מחדש את המכשיר"; big.text = "זיהוי הדיבור לא נטען"
+    }
     override fun onListening() { loading = false; paint(); if (spk.visibility != View.VISIBLE) paintSpk(); if (!answered) { small.text = "${Assistant.NAME} מקשיב"; } }
     override fun onPartial(text: String) {
         answered = false; orb.big = true
@@ -307,10 +314,17 @@ class AssistActivity : BaseActivity(), Listen.Callback {
         answered = true; orb.big = false
         if (spk.visibility != View.VISIBLE) paintSpk()   // הקול העברי אולי נטען בינתיים
         small.text = said; big.text = r.text; big.textSize = 19f
+        // נקבעה תזכורת ואין הרשאת התראות: מבקשים אותה (בלי להתחיל להקשיב שוב בינתיים)
+        if (r.notif && Notif.missing(this)) { Voice.speak(this, r.text); Notif.ask(this); return }
         // אחרי התשובה (ואחרי ההקראה, אם יש) — מקשיבים שוב; התשובה נשארת עד שאומרים משהו חדש
         Voice.speak(this, r.text) {
             if (!isFinishing) { if (voice) startListening() else h.postDelayed(close, 10000) }
         }
+    }
+
+    override fun onRequestPermissionsResult(code: Int, p: Array<out String>, g: IntArray) {
+        super.onRequestPermissionsResult(code, p, g)
+        if (code == Notif.REQ && Notif.missing(this)) small.text = Notif.DENIED
     }
 
     private val screenOff = object : android.content.BroadcastReceiver() {

@@ -120,6 +120,7 @@ class ChatActivity : BaseActivity(), Listen.Callback {
                 pending.text = shown
                 ChatStore.add(this, chat, false, shown)
                 r.then?.let { try { it() } catch (_: Exception) {} ; voiceMode = false; return@runOnUiThread }
+                if (r.notif && Notif.missing(this)) { Voice.speak(this, r.text); voiceMode = false; Notif.ask(this); return@runOnUiThread }
                 Voice.speak(this, r.text) { if (voiceMode && !isFinishing) startListening() }
             }
         }.start()
@@ -150,4 +151,10 @@ class ChatActivity : BaseActivity(), Listen.Callback {
         val d = ChatStore.load(this, chat.id) ?: return
         if (d.msgs.size != chat.msgs.size) { intent.putExtra("id", chat.id); intent.removeExtra("new"); recreate() }
     }
+
+    override fun onRequestPermissionsResult(code: Int, p: Array<out String>, g: IntArray) {
+        super.onRequestPermissionsResult(code, p, g)
+        if (code == Notif.REQ && Notif.missing(this)) Toast.makeText(this, Notif.DENIED, Toast.LENGTH_LONG).show()
+    }
+
 }

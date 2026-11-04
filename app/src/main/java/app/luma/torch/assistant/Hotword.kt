@@ -20,6 +20,8 @@ import app.luma.torch.dictation.SpeechEngine
 // "היי עזר": תיאום בין ההאזנה ברקע לבין מי שצריך את המיקרופון (העוזר, המקלדת הקולית)
 object Hotword {
     private var holds = 0
+    // סוד פנימי: רק "היי עזר" של עזרים עצמה יכולה לשלוח לחלונית פקודה לביצוע (אפליקציה אחרת לא מכירה אותו)
+    val token: String = java.util.UUID.randomUUID().toString()
     var service: HotwordService? = null
 
     fun enabled(c: Context) = Assistant.prefs(c).getBoolean("hotword", false)
@@ -105,7 +107,7 @@ class HotwordService : Service() {
             getSystemService(android.os.PowerManager::class.java).newWakeLock(
                 android.os.PowerManager.SCREEN_BRIGHT_WAKE_LOCK or android.os.PowerManager.ACQUIRE_CAUSES_WAKEUP, "luma:hotword").acquire(3000)
         } catch (_: Exception) {}
-        startActivity(Intent(this, AssistActivity::class.java).putExtra("q", q).putExtra("hotword", true)
+        startActivity(Intent(this, AssistActivity::class.java).putExtra("q", q).putExtra("hotword", true).putExtra("token", Hotword.token)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP))
     }
     private val power = object : BroadcastReceiver() {

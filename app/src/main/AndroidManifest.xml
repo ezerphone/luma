@@ -39,7 +39,7 @@
         <intent><action android:name="android.intent.action.TTS_SERVICE"/></intent>
         <package android:name="com.google.android.tts"/>
     </queries>
-    <application android:name=".LumaApp" android:label="עזרים" android:supportsRtl="true"
+    <application android:name=".LumaApp" android:allowBackup="false" android:label="עזרים" android:supportsRtl="true"
         android:dataExtractionRules="@xml/backup_rules_31" android:fullBackupContent="@xml/backup_rules_29" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher" android:theme="@android:style/Theme.Material.NoActionBar">
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
