@@ -105,13 +105,36 @@ object Assistant {
     // "כבה עוזר קולי" / "כבה היי עזר": מכבה את כל המתגים של "היי עזר" ועוצר את ההאזנה ברקע
     private val OFF_VERBS = listOf("כבה", "תכבה", "לכבות", "תכבי", "כבי", "בטל", "תבטל", "הפסק", "תפסיק").map { IntentEngine.n(it) }
     private val HOT_WORDS = listOf("עוזר קולי", "העוזר הקולי", "היי עזר", "האזנה", "ההאזנה").map { IntentEngine.n(it) }
-    private fun hotwordOff(c: Context, said: String): Reply? {
+    private fun isHotwordOff(said: String): Boolean {
         val t = IntentEngine.n(said)
-        if (OFF_VERBS.none { v -> t.split(' ').contains(v) } || HOT_WORDS.none { t.contains(it) }) return null
+        return OFF_VERBS.any { v -> t.split(' ').contains(v) } && HOT_WORDS.any { t.contains(it) }
+    }
+    private fun hotwordOff(c: Context, said: String): Reply? {
+        if (!isHotwordOff(said)) return null
         prefs(c).edit().putBoolean("hotword", false).putBoolean("hotword_charging", false)
             .putBoolean("hotword_locked", false).putBoolean("hotword_off", false).apply()
         Hotword.sync(c)
         return Reply("כיביתי את העוזר הקולי. אפשר להפעיל אותו מחדש בהגדרות עזר")
+    }
+
+    // במסך נעול: מידע כללי ושליטה במוזיקה — בלי קוד. כל השאר (פעולות ומידע מהמכשיר) — צריך לפתוח את הנעילה קודם
+    private val FREE_WHEN_LOCKED = setOf("time_query", "date_query", "world_time", "date_calc", "holiday_when", "hebrew_date_when",
+        "years_since", "zmanim", "parasha", "rosh_chodesh", "omer", "molad", "vat", "calc", "convert_units", "repeat", "random",
+        "cancel", "greeting", "thanks", "help", "joke", "how_are_you", "goodbye", "name_ask_assistant", "compliment", "feeling",
+        "cheer_up", "complaint", "media_pause", "media_play", "media_next", "media_prev", "play_song", "now_playing", "sleep_timer")
+
+    fun needsUnlock(c: Context, said: String): Boolean {
+        if (REPEAT.any { IntentEngine.n(said).contains(it) }) return false
+        if (isHotwordOff(said)) return true
+        if (Extras.calc(said) != null) return false
+        val r = engine(c).classify(said)
+        val first = IntentEngine.n(said).split(' ').firstOrNull { it !in IntentEngine.FILLER }
+        if (r.label == "open_app" || (first in OPEN_VERBS && r.prob < 0.35f)) {
+            if (findApp(c, slots.parse("open_app", r.prob, said).text) != null) return true
+            if (r.label == "open_app" && r.prob >= 0.35f) return false   // "לא מצאתי אפליקציה" — אין מה לבצע
+        }
+        if (r.label == "other" || r.label in GONE || r.prob < 0.35f) return false   // "לא הבנתי"
+        return slots.parse(INTERNAL[r.label] ?: r.label, r.prob, said).intent !in FREE_WHEN_LOCKED
     }
 
     fun handle(c: Context, said: String): Reply {

@@ -71,6 +71,8 @@ class AssistActivity : BaseActivity(), Listen.Callback {
         // גם כשהמסך כבוי או נעול ("היי עזר" מהכיס): מדליקים את המסך ומופיעים מעל מסך הנעילה
         setShowWhenLocked(true); setTurnScreenOn(true)
         Voice.init(this)
+        // כיבוי / נעילת מסך — החלונית נסגרת (לא נשארת מעל מסך הנעילה)
+        registerReceiver(screenOff, android.content.IntentFilter(Intent.ACTION_SCREEN_OFF))
         tone = Bubble.tone(this); dk = Bubble.dark(this)
 
         orb = Orb(this)
@@ -191,6 +193,8 @@ class AssistActivity : BaseActivity(), Listen.Callback {
     }
 
     private fun openChat() {
+        // הצ'אט הוא מידע מהמכשיר: במסך נעול — קודם פותחים את הנעילה
+        if (locked()) { unlockThen(null, "") { openChat() }; return }
         val i = Intent(this, ChatActivity::class.java)
         if (chat.msgs.isNotEmpty()) i.putExtra("id", chat.id)   // ממשיכים בצ'אט את מה שנאמר בחלונית
         startActivity(i); finish()
@@ -257,11 +261,31 @@ class AssistActivity : BaseActivity(), Listen.Callback {
         h.removeCallbacks(close)
         answered = false; orb.big = true
         small.text = "חושב…"; big.text = text; big.textSize = 22f
-        ChatStore.add(this, chat, true, text)
         Thread {
+            // מסך נעול ופעולה / מידע מהמכשיר: מבקשים לפתוח את הנעילה, ואחרי הפתיחה מבצעים
+            if (locked() && try { Assistant.needsUnlock(this, text) } catch (_: Exception) { true }) {
+                runOnUiThread { unlockThen(text, text) { process(text, voice) } }
+                return@Thread
+            }
             val r = try { Assistant.handle(this, text) } catch (_: Exception) { Assistant.Reply(Assistant.Say.ERROR) }
-            runOnUiThread { show(text, r, voice) }
+            runOnUiThread { ChatStore.add(this, chat, true, text); show(text, r, voice) }
         }.start()
+    }
+
+    private fun locked() = getSystemService(android.app.KeyguardManager::class.java)?.isKeyguardLocked == true
+
+    // בקשת פתיחת נעילה (מסך הקוד של המערכת). הצליח → go; בוטל → הודעה בחלונית
+    private fun unlockThen(said: String?, shown: String, go: () -> Unit) {
+        h.removeCallbacks(close); listen?.cancel(); Voice.stop()
+        answered = true; orb.big = false
+        small.text = shown; big.text = "צריך לפתוח את הנעילה"; big.textSize = 19f
+        val km = getSystemService(android.app.KeyguardManager::class.java)
+        if (km == null) { go(); return }
+        km.requestDismissKeyguard(this, object : android.app.KeyguardManager.KeyguardDismissCallback() {
+            override fun onDismissSucceeded() { if (!isFinishing) go() }
+            override fun onDismissCancelled() { if (!isFinishing) big.text = "צריך לפתוח את הנעילה כדי לבצע את זה" }
+            override fun onDismissError() { if (!isFinishing) big.text = "צריך לפתוח את הנעילה כדי לבצע את זה" }
+        })
     }
 
     private fun show(said: String, r: Assistant.Reply, voice: Boolean) {
@@ -282,7 +306,12 @@ class AssistActivity : BaseActivity(), Listen.Callback {
         }
     }
 
+    private val screenOff = object : android.content.BroadcastReceiver() {
+        override fun onReceive(c: Context, i: Intent) { finish() }
+    }
+
     override fun onDestroy() {
+        try { unregisterReceiver(screenOff) } catch (_: Exception) {}
         h.removeCallbacksAndMessages(null); orb.stop(); micWave.active = false
         listen?.cancel(); Voice.stop()
         super.onDestroy()
