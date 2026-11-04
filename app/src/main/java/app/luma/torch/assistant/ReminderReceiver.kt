@@ -25,8 +25,11 @@ class ReminderReceiver : BroadcastReceiver() {
                 enableVibration(true)
             })
         }
+        // לחיצה על ההתראה פותחת את עזר (וההתראה נעלמת)
+        val open = android.app.PendingIntent.getActivity(c, id, Intent(c, ChatHistoryActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT)
         nm.notify(id, Notification.Builder(c, CH).setSmallIcon(R.drawable.ic_mic).setContentTitle(Assistant.NAME).setContentText(text)
-            .setCategory(Notification.CATEGORY_REMINDER).setAutoCancel(true).build())
+            .setCategory(Notification.CATEGORY_REMINDER).setContentIntent(open).setAutoCancel(true).build())
     }
 
     companion object { const val CH = "assistant_reminders" }

@@ -367,6 +367,7 @@ class IntentEngine {
         fun zman(): String {
             for ((k, v) in ZMANIM) if (norm.any { it == k || (it.length > 3 && it.substring(1) == k) }) {
                 if (v == "fast") return if (has("סוף") || has("נגמר") || has("צאת") || has("יציאת")) "fast_end" else "fast_start"
+                if (v == "mincha" && has("קטנה")) return "mincha_ketana"
                 if (v == "mincha" && has("גדולה")) return "mincha"
                 if (v == "shema" || v == "tefila") return v
                 if (v == "chatzot" && has("הלילה")) return "chatzot_night"

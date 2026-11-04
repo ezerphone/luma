@@ -208,7 +208,7 @@ object Assistant {
             "stopwatch_start" -> { prefs(c).edit().putLong("stopwatch", System.currentTimeMillis()).apply(); Reply("הסטופר התחיל") }
             "stopwatch_stop" -> stopwatch(c)
             "date_calc", "holiday_when", "hebrew_date_when" -> whenIs(u, today, daysOnly = u.intent == "date_calc")
-            "years_since" -> u.number?.toInt()?.let { y -> Reply("עברו ${today.year - y} שנים מאז $y") } ?: Reply("מאיזו שנה?")
+            "years_since" -> u.number?.toInt()?.let { y -> yearsSince(today.year, y) } ?: Reply("מאיזו שנה?")
             // תזכורות
             "reminder" -> reminder(c, u)
             "reminder_list" -> reminderList(c)
@@ -297,7 +297,7 @@ object Assistant {
 
     private fun date(u: IntentEngine.Understanding): Reply {
         val d = LocalDate.now().plusDays(u.dayOffset.toLong())
-        val which = if (u.dayOffset == 1) "מחר" else "היום"
+        val which = dayWord(u.dayOffset)
         val greg = "%d.%d.%d".format(d.dayOfMonth, d.monthValue, d.year)
         return Reply("$which ${dayName(d)}, ${HebCal.format(d)}" + if (u.hebrew) "" else ", $greg")
     }
@@ -354,11 +354,30 @@ object Assistant {
         return Reply("ראש חודש $m: " + days.joinToString(" ו") { "${dayName(it)} ${it.dayOfMonth}.${it.monthValue}" })
     }
 
+    // "היום", "מחר", "מחרתיים"
+    fun dayWord(offset: Int) = when (offset) { 1 -> "מחר"; 2 -> "מחרתיים"; else -> "היום" }
+    // "כמה שנים עברו מאז…"
+    private fun yearsSince(now: Int, y: Int): Reply {
+        val n = now - y
+        return Reply(when {
+            n < 0 -> "שנת $y עוד לא הגיעה"
+            n == 0 -> "$y היא השנה הנוכחית"
+            n == 1 -> "עברה שנה אחת מאז $y"
+            n == 2 -> "עברו שנתיים מאז $y"
+            else -> "עברו $n שנים מאז $y"
+        })
+    }
     private fun omer(today: LocalDate): Reply {
-        val n = HebCal.omerDay(today) ?: return Reply("עכשיו לא ימי ספירת העומר")
+        val n = HebCal.omerDay(today)
+        if (n == null) {
+            // ט״ו בניסן (יום ראשון של פסח): הספירה מתחילה הלילה
+            return if (HebCal.omerDay(today.plusDays(1)) == 1) Reply("הלילה מתחילים לספור: יום אחד לעומר.") else Reply("עכשיו לא ימי ספירת העומר")
+        }
+        fun days(k: Int) = if (k == 1) "יום אחד" else "$k ימים"
         val w = n / 7; val d = n % 7
-        val weeks = if (w == 0) "" else " שהם ${if (w == 1) "שבוע אחד" else "$w שבועות"}" + if (d > 0) " ו${if (d == 1) "יום אחד" else "$d ימים"}" else ""
-        return Reply("היום $n יום לעומר$weeks. הלילה סופרים ${n + 1}.")
+        val weeks = if (w == 0) "" else " שהם ${if (w == 1) "שבוע אחד" else "$w שבועות"}" + if (d > 0) " ו${days(d)}" else ""
+        val tonight = if (n < 49) " הלילה סופרים ${n + 1}." else " הלילה מסתיימת הספירה."
+        return Reply("היום ${days(n)} לעומר$weeks.$tonight")
     }
 
     private fun molad(today: LocalDate): Reply {
@@ -601,7 +620,9 @@ object Assistant {
         val items = (0 until l.length()).map { l.getJSONObject(it) }.filter { it.getLong("at") > now && !it.optBoolean("pause") }.sortedBy { it.getLong("at") }
         if (items.isEmpty()) return Reply("אין תזכורות לבטל")
         val q = IntentEngine.n(text.orEmpty())
-        val hit = items.firstOrNull { q.isNotBlank() && match(IntentEngine.n(it.getString("text")), q) } ?: items.first()
+        // ביקשו תזכורת מסוימת ולא נמצאה — לא מבטלים אחרת במקומה. בלי פירוט — הקרובה
+        val hit = if (q.isBlank()) items.first() else items.firstOrNull { match(IntentEngine.n(it.getString("text")), q) }
+            ?: return Reply("לא מצאתי תזכורת על ${text.orEmpty().trim()}")
         cancelAlarm(c, hit.getInt("id")); done(c, hit.getInt("id"))
         return Reply("ביטלתי את התזכורת: ${hit.getString("text")}")
     }

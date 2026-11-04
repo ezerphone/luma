@@ -130,7 +130,9 @@ object HebCal {
     fun nextRoshChodesh(today: LocalDate): Pair<HDate, List<LocalDate>> {
         val h = of(today)
         var y = h.y; var m = h.m
-        if (h.d == 1 || h.d == 30) return HDate(y, m, 1) to listOfNotNull(if (h.d == 30) today else null, if (h.d == 30) today.plusDays(1) else today)
+        if (h.d == 1) return HDate(y, m, 1) to listOf(today)
+        // ל׳ בחודש: היום הראשון של ראש חודש של החודש הבא
+        if (h.d == 30) { val nm = if (m == lastMonth(y)) 1 else m + 1; return HDate(if (nm == 7) y + 1 else y, nm, 1) to listOf(today, today.plusDays(1)) }
         m = if (m == lastMonth(y)) 1 else m + 1
         if (m == 7) y++
         val first = date(fixed(y, m, 1))

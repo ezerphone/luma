@@ -47,7 +47,22 @@ class MockLocationActivity : BaseActivity() {
         )
     }
 
+    // האפליקציות שיש להן היום הרשאת מיקום מדומה — נקרא מהמערכת עצמה (גם אם ההרשאה ניתנה או בוטלה מחוץ לעזרים)
+    private fun systemList(): List<String>? = try {
+        val am = getSystemService(android.app.AppOpsManager::class.java)
+        packageManager.getInstalledApplications(0).filter { ai ->
+            am.unsafeCheckOpRawNoThrow("android:mock_location", ai.uid, ai.packageName) == android.app.AppOpsManager.MODE_ALLOWED
+        }.map { it.packageName }.filter { it != packageName }
+    } catch (_: Throwable) { null }
+
     private fun refreshList() {
+        Thread {
+            val sys = systemList()
+            runOnUiThread { if (!isFinishing) { if (sys != null) Torch.mockLocationApps = sys.toSet(); paintList() } }
+        }.start()
+    }
+
+    private fun paintList() {
         listBox.removeAllViews()
         val apps = Torch.mockLocationApps.sorted()
         if (apps.isEmpty()) {

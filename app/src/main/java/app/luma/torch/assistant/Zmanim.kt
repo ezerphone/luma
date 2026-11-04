@@ -61,7 +61,7 @@ object Zmanim {
         val cy = city(c)
         val now = LocalDateTime.now()
         val d = now.toLocalDate().plusDays(dayOffset.toLong())
-        val which = if (dayOffset == 1) "מחר" else "היום"
+        val which = Assistant.dayWord(dayOffset)
         val friday = if (now.dayOfWeek == DayOfWeek.FRIDAY && (sunset(now.toLocalDate(), cy)?.isAfter(now) == true)) now.toLocalDate()
                      else now.toLocalDate().with(TemporalAdjusters.next(DayOfWeek.FRIDAY))
         val saturday = if (now.dayOfWeek == DayOfWeek.SATURDAY && (tzeit(now.toLocalDate(), cy)?.isAfter(now) == true)) now.toLocalDate()
@@ -77,6 +77,7 @@ object Zmanim {
             "shema" -> "סוף זמן קריאת שמע $which ב-${hm(hour(d, cy, 3.0))}"
             "tefila" -> "סוף זמן תפילה $which ב-${hm(hour(d, cy, 4.0))}"
             "mincha" -> "מנחה גדולה $which ב-${hm(hour(d, cy, 6.5))}"
+            "mincha_ketana" -> "מנחה קטנה $which ב-${hm(hour(d, cy, 9.5))}"
             "plag" -> "פלג המנחה $which ב-${hm(hour(d, cy, 10.75))}"
             "fast_start" -> "תחילת הצום (עלות השחר) $which ב-${hm(alot(d, cy))}"
             "fast_end" -> "סוף הצום (צאת הכוכבים) $which ב-${hm(tzeit(d, cy))}"
