@@ -234,7 +234,7 @@ class AssistActivity : BaseActivity(), Listen.Callback {
 
     // המודל נטען: "רגע…" (החלונית לא נסגרת בינתיים)
     override fun onLoading() { loading = true; h.removeCallbacks(close); if (!answered) small.text = "רגע…"; paint() }
-    override fun onListening() { loading = false; paint(); if (!answered) { small.text = "${Assistant.NAME} מקשיב"; } }
+    override fun onListening() { loading = false; paint(); if (spk.visibility != View.VISIBLE) paintSpk(); if (!answered) { small.text = "${Assistant.NAME} מקשיב"; } }
     override fun onPartial(text: String) {
         answered = false; orb.big = true
         small.text = "${Assistant.NAME} מקשיב"; big.text = text; big.textSize = 22f
@@ -274,6 +274,7 @@ class AssistActivity : BaseActivity(), Listen.Callback {
         }
         // תשובה: השאלה בקטן, התשובה בגדול; הכדור מתכווץ
         answered = true; orb.big = false
+        if (spk.visibility != View.VISIBLE) paintSpk()   // הקול העברי אולי נטען בינתיים
         small.text = said; big.text = r.text; big.textSize = 19f
         // אחרי התשובה (ואחרי ההקראה, אם יש) — מקשיבים שוב; התשובה נשארת עד שאומרים משהו חדש
         Voice.speak(this, r.text) {

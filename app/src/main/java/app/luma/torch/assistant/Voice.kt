@@ -13,7 +13,13 @@ object Voice {
     private const val GOOGLE = "com.google.android.tts"
     private var tts: TextToSpeech? = null
     @Volatile var ready = false; private set    // המנוע סיים להיטען (הצליח או לא)
-    @Volatile var hebrew = false; private set
+    @Volatile private var found = false
+    // יש קול עברי מקומי? אם עוד לא נמצא — שואלים את המנוע שוב (שאלה מהירה, בלי אתחול).
+    // Google TTS טוען את הקול העברי רק אחרי שמתחברים אליו, ולכן בבדיקה הראשונה הוא עלול עוד לא להופיע
+    val hebrew: Boolean get() {
+        if (ready && !found && tts != null) found = pickHebrew()
+        return found
+    }
     private val main = Handler(Looper.getMainLooper())
     private var onDone: (() -> Unit)? = null
     private var pending: Pair<String, (() -> Unit)?>? = null   // הקראה שהתבקשה לפני שהמנוע סיים להיטען
@@ -30,7 +36,7 @@ object Voice {
         } catch (_: Exception) {}
         val listener = TextToSpeech.OnInitListener { st ->
             main.post {
-                hebrew = st == TextToSpeech.SUCCESS && pickHebrew()
+                found = st == TextToSpeech.SUCCESS && pickHebrew()
                 ready = true
                 val p = pending; pending = null
                 p?.let { (text, done) -> speak(app, text, done) }
@@ -62,10 +68,10 @@ object Voice {
         } catch (_: Exception) { false }
     }
 
-    // בדיקה מחדש (למשל אחרי שהותקן קול) — משחרר ומאתחל את המנוע; cb כשהבדיקה הסתיימה
+    // חיבור מחדש למנוע — רק אחרי התקנת קול (ההתקנה עוצרת את Google TTS); cb כשהחיבור הסתיים
     fun recheck(c: Context, cb: (() -> Unit)? = null) {
         try { tts?.shutdown() } catch (_: Exception) {}
-        tts = null; ready = false; hebrew = false
+        tts = null; ready = false; found = false
         cb?.let { waiters += it }
         init(c)
     }

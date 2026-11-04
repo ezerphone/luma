@@ -37,12 +37,8 @@ class SpeakActivity : BaseActivity() {
         paint()
     }
 
-    // בכל חזרה למסך: אם עדיין אין קול עברי — בודקים שוב (אולי נוסף בינתיים)
-    override fun onResume() {
-        super.onResume()
-        if (!busy && Voice.ready && !Voice.hebrew) Voice.recheck(this) { paint() }
-        paint()
-    }
+    // בכל חזרה למסך הבדיקה מתעדכנת (Voice.hebrew שואל את המנוע שוב אם עוד לא נמצא קול)
+    override fun onResume() { super.onResume(); paint() }
 
     private fun paint() {
         if (busy) return
@@ -64,19 +60,17 @@ class SpeakActivity : BaseActivity() {
         if (busy) return
         busy = true; install.isEnabled = false; install.text = "מתקין…"
         TtsRestore.install(this) { r ->
-            if (r == TtsRestore.Result.OK && !Voice.hebrew) { install.text = "מתקין… רגע"; poll(10) }   // הקול נטען במנוע אחרי שנייה-שתיים
+            if (r == TtsRestore.Result.OK && !Voice.hebrew) { install.text = "מתקין… רגע"; poll(10) }   // הקול נטען במנוע תוך רגע
             else done(r)
         }
     }
 
-    // אחרי ההעתקה: בודקים שוב כל שנייה וחצי עד שהקול מופיע (עד 15 שניות), בלי לצאת מהמסך
+    // אחרי ההעתקה (והחיבור מחדש למנוע): שואלים שוב כל חצי שנייה עד שהקול מופיע (עד 5 שניות), בלי לצאת מהמסך
     private fun poll(left: Int) {
         install.postDelayed({
             if (isFinishing) return@postDelayed
-            Voice.recheck(this) {
-                if (Voice.hebrew || left <= 1) done(TtsRestore.Result.OK) else poll(left - 1)
-            }
-        }, 1500)
+            if (Voice.hebrew || left <= 1) done(TtsRestore.Result.OK) else poll(left - 1)
+        }, 500)
     }
 
     private fun done(r: TtsRestore.Result) {
