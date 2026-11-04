@@ -37,6 +37,15 @@ class CustomizationActivity : BaseActivity() {
             return when (cur) { assetSha(c, "camera_stock.apk") -> 0; assetSha(c, "camera_upgraded.apk") -> 1; else -> null }
         }
         val CAMERAS = listOf("מקורית", "משודרגת")
+        // אחרי החלפת מצלמה: בעלייה הבאה נותנים לה את הרשאות האחסון (בלי זה המקורית נסגרת מיד — ההיתר להרשאות המוגבלות אובד בהחלפה)
+        private const val GRANT_KEY = "camera_grant_pending"
+        private const val GRANT_CMD = "pm grant com.mediatek.camera android.permission.READ_EXTERNAL_STORAGE 2>/dev/null; " +
+            "pm grant com.mediatek.camera android.permission.WRITE_EXTERNAL_STORAGE 2>/dev/null; echo G_OK"
+        private fun prefs(c: Context) = c.getSharedPreferences("customization", Context.MODE_PRIVATE)
+        fun onBoot(c: Context) {
+            if (!prefs(c).getBoolean(GRANT_KEY, false)) return
+            if (RootShell.run(GRANT_CMD).second.contains("G_OK")) prefs(c).edit().remove(GRANT_KEY).apply()
+        }
         private val CAMERA_ASSET = listOf("camera_stock.apk", "camera_upgraded.apk")
     }
 
@@ -82,7 +91,7 @@ class CustomizationActivity : BaseActivity() {
 
     // ---------- לפני ההגדרה ----------
     private fun buildSetup() {
-        radio = radioNow; html = if (htmlNow) 0 else -1; store = if (storeNow) 0 else -1; cam = camNow ?: 0
+        radio = radioNow; html = if (htmlNow) 0 else -1; store = if (storeNow) 0 else -1
         val radioOk = listOf(true, radioNow != 0, radioNow == 2)
         val radioSec = section("רדיו", choice(listOf("ללא רדיו", "רדיו כשר", "רדיו רגיל"), radioOk, { radio }) { radio = it })
         if (radioNow == 0) radioSec.addView(note("לא קיים במכשיר"))
@@ -90,17 +99,18 @@ class CustomizationActivity : BaseActivity() {
         if (!htmlNow) htmlSec.addView(note("לא קיים במכשיר"))
         val storeSec = section("חנות כשרה", choice(listOf("להשאיר", "למחוק"), listOf(storeNow, storeNow), { store }) { store = it })
         if (!storeNow) storeSec.addView(note("לא קיים במכשיר"))
-        val camSec = section("מצלמה", choice(CAMERAS, listOf(true, true), { cam }) { cam = it }, note("אפשר להחליף גם אחר כך"))
-        val ok = tv("אישור", 16f) { confirmSetup() }.apply { style(this, true) }
-        page(header("התאמה אישית", null, "רדיו, מציג HTML וחנות נבחרים פעם אחת."), radioSec, htmlSec, storeSec, camSec, ok)
+        val ok = tv("אישור (בלתי הפיך)", 16f) { confirmSetup() }.apply { style(this, true) }
+        ok.layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(22) }
+        // המצלמה נפרדת מההגדרה החד-פעמית: החלפה שלה לא מסמנת את ההגדרה כ"בוצעה"
+        val (camSec, swap) = cameraPart()
+        page(header("התאמה אישית", null, "הגדרה חד-פעמית: רדיו, מציג HTML וחנות כשרה"), radioSec, htmlSec, storeSec, ok, camSec, swap)
     }
 
     private fun confirmSetup() {
         val lines = listOf(
             "רדיו: " + when { radio == radioNow -> "נשאר כמו שהוא"; radio == 0 -> "יימחק"; else -> "יוחלף ברדיו כשר" },
             "מציג HTML: " + if (!htmlNow) "לא קיים" else if (html == 1) "יימחק" else "נשאר",
-            "חנות כשרה: " + if (!storeNow) "לא קיימת" else if (store == 1) "תימחק" else "נשארת",
-            "מצלמה: " + if (cam == camNow) "נשארת ${CAMERAS[cam]}" else "תוחלף ל${CAMERAS[cam]}")
+            "חנות כשרה: " + if (!storeNow) "לא קיימת" else if (store == 1) "תימחק" else "נשארת")
         dlg().setTitle("לבצע את השינויים?")
             .setMessage("שים לב: הפעולה בלתי הפיכה.\n\n" + lines.joinToString("\n") + "\n\nבסיום המכשיר יופעל מחדש.")
             .setPositiveButton("ביצוע") { _, _ -> runSetup() }
@@ -119,6 +129,7 @@ class CustomizationActivity : BaseActivity() {
     private val REMOUNT = "mount -o remount,rw / 2>/dev/null; mount -o remount,rw /system 2>/dev/null; mount -o remount,rw /system_ext 2>/dev/null; "
 
     private fun cameraCmd(which: Int): String {
+        prefs(this).edit().putBoolean(GRANT_KEY, true).commit()
         val f = asset(CAMERA_ASSET[which])
         return "cp ${q(f.path)} $CAMERA_APK && chmod 644 $CAMERA_APK && rm -rf $CAMERA_DIR/oat && " +
             "{ pm clear com.mediatek.camera >/dev/null 2>&1; echo C_OK; }; "
@@ -141,7 +152,6 @@ class CustomizationActivity : BaseActivity() {
                 }
                 if (htmlNow && html == 1) { cmd.append("rm -rf $HTML_DIR; [ -d $HTML_DIR ] || echo H_OK; "); steps += "H_OK" to "מציג HTML" }
                 if (storeNow && store == 1) { cmd.append("rm -rf $STORE_DIR; [ -d $STORE_DIR ] || echo S_OK; "); steps += "S_OK" to "חנות כשרה" }
-                if (cam != camNow) { cmd.append(cameraCmd(cam)); steps += "C_OK" to "מצלמה" }
             } catch (_: Exception) { steps += "X_FAIL" to "הכנת הקבצים" }
             val out = if (steps.any { it.first == "X_FAIL" }) "" else runAsRoot(cmd.toString()).second
             val failed = steps.filter { !out.contains(it.first) }
@@ -163,7 +173,8 @@ class CustomizationActivity : BaseActivity() {
     }
 
     // ---------- אחרי ההגדרה: רק מצלמה ----------
-    private fun buildCameraOnly() {
+    // חלק המצלמה (גם לפני וגם אחרי ההגדרה): בחירה + כפתור "החלפת מצלמה" משלו
+    private fun cameraPart(): Pair<View, View> {
         cam = camNow ?: -1
         val now = TextView(this).apply { textSize = 13f; setTextColor(dim); setPadding(dp(2), dp(10), 0, 0) }
         lateinit var swap: TextView
@@ -172,14 +183,23 @@ class CustomizationActivity : BaseActivity() {
             val can = cam >= 0 && cam != camNow
             swap.isEnabled = can; swap.alpha = if (can) 1f else 0.45f
         }
-        swap = tv("החלפה", 16f) { confirmCamera() }.apply { style(this, true) }
+        swap = tv("החלפת מצלמה", 16f) { confirmCamera() }.apply { style(this, true) }
         val sec = section("מצלמה", choice(CAMERAS, listOf(true, true), { cam }) { cam = it; paint() }, now)
-        val info = TextView(this).apply {
-            text = "בהחלפה הגדרות המצלמה מתאפסות והמכשיר מופעל מחדש."
-            textSize = 13f; setTextColor(dim); gravity = Gravity.START; setPadding(dp(4), dp(12), dp(4), 0)
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(swap)
+            addView(TextView(this@CustomizationActivity).apply {
+                text = "בהחלפה הגדרות המצלמה מתאפסות והמכשיר מופעל מחדש."
+                textSize = 13f; setTextColor(dim); gravity = Gravity.START; setPadding(dp(4), dp(12), dp(4), 0)
+            })
         }
-        page(header("התאמה אישית"), sec, swap, info)
         paint()
+        return sec to box
+    }
+
+    private fun buildCameraOnly() {
+        val (sec, box) = cameraPart()
+        page(header("התאמה אישית"), sec, box)
     }
 
     private fun confirmCamera() {
